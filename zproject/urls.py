@@ -1,6 +1,8 @@
 import os
 from typing import List, Union
 
+from zerver.views.testpro import *
+
 from django.conf import settings
 from django.conf.urls import include
 from django.conf.urls.i18n import i18n_patterns
@@ -650,6 +652,8 @@ i18n_urls = [
     path("use-cases/", landing_view, {"template_name": "zerver/use-cases.html"}),
     path("self-hosting/", landing_view, {"template_name": "zerver/self-hosting.html"}),
     path("security/", landing_view, {"template_name": "zerver/security.html"}),
+
+    path("hellopro/",hello,name='hellopro'),
 ]
 
 # Make a copy of i18n_urls so that they appear without prefix for english
