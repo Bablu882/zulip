@@ -1,0 +1,50 @@
+
+{% extends 'zerver/app/base.html' %}
+{% block content %}
+<div class="row">
+    <div class="col-sm-4">
+       <h4 class="text-centre alert alert-info">Add New User</h4>
+       <form action="" method="POST">
+        {{ csrf_input }}
+        {{form}}
+        <input type="submit" class="btn btn-danger" value="ADD NEW USER">
+        </form>
+
+    </div>
+
+
+<div class="col-sm-8 inline">
+    <h4 class="text-center alert alert-warning">Show User Details</h4>
+    {% if users %}
+    {% endif %}<table class="table table-hover">
+        <thead class="alert alert-primary">
+          <tr>
+            <th scope="col">ID</th>
+            <th scope="col">NAME</th>
+            <th scope="col">EMAIL</th>
+            <th scope="col">MOBILE NO</th>
+            <th scope="col">City</th>
+            <th scope="col">Action</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for us in users %}
+          <tr>
+            <th scope="row">{{us.id}}</th>
+            <td>{{us.name}}</td>
+            <td>{{us.email}}</td>
+            <td>{{us.mobile}}</td>
+            <td>{{us.city}}</td>
+            <td><a href="/update/{{us.id}}" class="btn btn-success">EDIT</a></td>
+            <td><form action="/delete/{{us.id}} " method="get">{{ csrf_input }}
+              <input type="submit" class="btn btn-danger" value="DEIETE">
+            </form></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+
+</div>
+{% endblock content %}

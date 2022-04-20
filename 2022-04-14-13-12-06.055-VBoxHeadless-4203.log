@@ -1,0 +1,12 @@
+Log created: 2022-04-14T13:12:06.552881000Z
+Process ID:  4203 (0x106b)
+Parent PID:  1 (0x1)
+Executable:  /usr/lib/virtualbox/VBoxHeadless
+Arg[0]: /usr/lib/virtualbox/VBoxHeadless
+Arg[1]: --comment
+Arg[2]: zulip_default_1648554217408_29183
+Arg[3]: --startvm
+Arg[4]: 4fee5113-87a7-4d86-a51f-b19d4356ddec
+Arg[5]: --vrde
+Arg[6]: config
+AddRef: illegal refcnt=3221225469 state=2

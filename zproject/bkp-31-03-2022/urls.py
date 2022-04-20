@@ -1,10 +1,6 @@
 import os
 from typing import List, Union
 
-
-
-from zerver.views.testpro import *
-
 from django.conf import settings
 from django.conf.urls import include
 from django.conf.urls.i18n import i18n_patterns
@@ -171,7 +167,6 @@ from zerver.views.typing import send_notification_backend
 from zerver.views.unsubscribe import email_unsubscribe
 from zerver.views.upload import (
     serve_file_backend,
-    serve_file_download_backend,
     serve_file_url_backend,
     serve_local_file_unauthed,
     upload_file_backend,
@@ -637,11 +632,6 @@ i18n_urls = [
     path("case-studies/rust/", landing_view, {"template_name": "zerver/rust-case-study.html"}),
     path("case-studies/lean/", landing_view, {"template_name": "zerver/lean-case-study.html"}),
     path(
-        "case-studies/asciidoctor/",
-        landing_view,
-        {"template_name": "zerver/asciidoctor-case-study.html"},
-    ),
-    path(
         "for/communities/",
         landing_view,
         {"template_name": "zerver/for-communities.html"},
@@ -654,14 +644,6 @@ i18n_urls = [
     path("use-cases/", landing_view, {"template_name": "zerver/use-cases.html"}),
     path("self-hosting/", landing_view, {"template_name": "zerver/self-hosting.html"}),
     path("security/", landing_view, {"template_name": "zerver/security.html"}),
-
-    path("hellopro/",hello,name='hellopro'),
-    path('addshow',addshow,name='addshow'),
-    path('delete/<int:id>/',delete,name='delete'),
-    path('update/<int:id>/',update,name='update'),
-
-
-
 ]
 
 # Make a copy of i18n_urls so that they appear without prefix for english
@@ -688,19 +670,12 @@ urls += [
         name="local_file_unauthed",
     ),
     rest_path(
-        "user_uploads/download/<realm_id_str>/<path:filename>",
-        GET=(serve_file_download_backend, {"override_api_url_scheme"}),
-    ),
-    rest_path(
         "user_uploads/<realm_id_str>/<path:filename>",
-        GET=(serve_file_backend, {"override_api_url_scheme", "allow_anonymous_user_web"}),
+        GET=(serve_file_backend, {"override_api_url_scheme"}),
     ),
     # This endpoint redirects to camo; it requires an exception for the
     # same reason.
-    rest_path(
-        "thumbnail",
-        GET=(backend_serve_thumbnail, {"override_api_url_scheme", "allow_anonymous_user_web"}),
-    ),
+    rest_path("thumbnail", GET=(backend_serve_thumbnail, {"override_api_url_scheme"})),
     # Avatars have the same constraint because their URLs are included
     # in API data structures used by both the mobile and web clients.
     rest_path(
@@ -935,7 +910,3 @@ urls += [
 # reverse URL mapping points to i18n URLs which causes the frontend
 # tests to fail
 urlpatterns = i18n_patterns(*i18n_urls) + urls + legacy_urls
-
-
-
-

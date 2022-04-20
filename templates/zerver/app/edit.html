@@ -1,0 +1,18 @@
+{% extends 'zerver/app/base.html' %}
+
+{% block content %}
+<div class="col">
+    <div class="col-sm-8 offset-2">
+        <h1 class="alert alert-info">Update Information</h1>
+        <form action="" method="post">
+            {{ csrf_input }}
+            {{frm}}
+            <input type="submit" class="btn btn-success" value="Update">
+            <a href="/addshow" class="btn btn-danger"> Back to Home</a>
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock content %}

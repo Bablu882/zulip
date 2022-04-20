@@ -1,3 +1,5 @@
+from zerver.models import User
+
 import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -522,3 +524,30 @@ class RealmRedirectForm(forms.Form):
         except Realm.DoesNotExist:
             raise ValidationError(_("We couldn't find that Zulip organization."))
         return subdomain
+
+
+
+
+
+class UserRegistration(forms.ModelForm):
+
+    class Meta:
+        model=User
+        fields=['name','email','mobile','city']
+        def __init__(self, *args, **kwargs):
+            super(User, self).__init__(*args, **kwargs)
+            for field_name, field in self.fields.items():
+                if field.widget.attrs.get('class'):
+                    field.widget.attrs['class'] += ' form-control'
+                else:
+                    field.widget.attrs['class']='form-control'
+
+
+        # Widgets={
+        #         'name': forms.TextInput(attrs={"class":"form-control"}),
+        #         'email': forms.EmailInput(attrs={"class":"form-control"}),
+        #         'mobile': forms.TextInput(attrs={"class":"form-control"}),
+        #         'city': forms.TextInput(attrs={"class":"form-control"}),
+        #         }
+
+        
