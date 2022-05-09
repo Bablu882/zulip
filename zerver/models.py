@@ -2776,7 +2776,7 @@ class ArchiveTransaction(models.Model):
     # Valid types:
     RETENTION_POLICY_BASED = 1  # Archiving was executed due to automated retention policies
     MANUAL = 2  # Archiving was run manually, via move_messages_to_archive function
-
+                                                 
     # ForeignKey to the realm with which objects archived in this transaction are associated.
     # If type is set to MANUAL, this should be null.
     realm: Optional[Realm] = models.ForeignKey(Realm, null=True, on_delete=CASCADE)
@@ -2800,7 +2800,7 @@ class ArchivedMessage(AbstractMessage):
     archive_transaction: ArchiveTransaction = models.ForeignKey(
         ArchiveTransaction, on_delete=CASCADE
     )
-
+    
 
 class Message(AbstractMessage):
     id: int = models.AutoField(auto_created=True, primary_key=True, verbose_name="ID")

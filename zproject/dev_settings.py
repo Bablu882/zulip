@@ -42,7 +42,7 @@ else:
 
 EXTERNAL_HOST_WITHOUT_PORT = deport(EXTERNAL_HOST)
 
-FAKE_EMAIL_DOMAIN = "zulipdev.com"
+FAKE_EMAIL_DOMAIN = "webnyxadev.com"
 
 ALLOWED_HOSTS = ["*"]
 

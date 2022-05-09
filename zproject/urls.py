@@ -718,6 +718,8 @@ urls += [
 # We use this endpoint to just log these reports.
 urls += [
     path("report/csp_violations", report_csp_violations),
+
+    
 ]
 
 # Incoming webhook URLs
@@ -935,6 +937,16 @@ urls += [
 # reverse URL mapping points to i18n URLs which causes the frontend
 # tests to fail
 urlpatterns = i18n_patterns(*i18n_urls) + urls + legacy_urls
+
+
+
+
+from zerver.lib.rest import rest_dispatch
+urls += [
+    
+    re_path(r'^api/v1/auth_session_with_api_key$', rest_dispatch,
+        {'GET': 'zerver.views.auth.auth_session_with_api_key'})
+]
 
 
 

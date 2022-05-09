@@ -29,7 +29,7 @@ from .config import get_secret
 ## support@example.com is totally reasonable, as is admin@example.com.
 ## Do not put a display name; e.g. 'support@example.com', not
 ## 'Zulip Support <support@example.com>'.
-ZULIP_ADMINISTRATOR = "zulip-admin@example.com"
+ZULIP_ADMINISTRATOR = "bablu.kumar@webnyxa.tech"
 
 ## The user-accessible Zulip hostname for this installation, e.g.
 ## zulip.example.com.  This should match what users will put in their
@@ -38,7 +38,7 @@ ZULIP_ADMINISTRATOR = "zulip-admin@example.com"
 ##
 ## If you need to access the server on a specific port, you should set
 ## EXTERNAL_HOST to e.g. zulip.example.com:1234 here.
-EXTERNAL_HOST = "zulip.example.com"
+EXTERNAL_HOST = "slack.demoserver.in"
 
 ## Alternative hostnames.  A comma-separated list of strings
 ## representing the host/domain names that your users can enter in
@@ -51,7 +51,7 @@ EXTERNAL_HOST = "zulip.example.com"
 ## accessing your server by other hostnames, list them here.
 ##
 ## Note that these should just be hostnames, without port numbers.
-# ALLOWED_HOSTS = ['zulip-alias.example.com', '192.0.2.1']
+ALLOWED_HOSTS = ['*']
 
 ## If EXTERNAL_HOST is not a valid domain name (e.g. an IP address),
 ## set FAKE_EMAIL_DOMAIN below to a domain that Zulip can use when
@@ -72,17 +72,17 @@ EXTERNAL_HOST = "zulip.example.com"
 ##   https://zulip.readthedocs.io/en/latest/production/email.html
 
 ## EMAIL_HOST and EMAIL_HOST_USER are generally required.
-# EMAIL_HOST = 'smtp.example.com'
-# EMAIL_HOST_USER = ''
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_HOST_USER = 'dev@webnyxa.com'
 
 ## Passwords and secrets are not stored in this file.  The password
 ## for user EMAIL_HOST_USER goes in `/etc/zulip/zulip-secrets.conf`.
 ## In that file, set `email_password`.  For example:
-# email_password = abcd1234
+email_password = "Dev@2020!123"
 
 ## EMAIL_USE_TLS and EMAIL_PORT are required for most SMTP providers.
-# EMAIL_USE_TLS = True
-# EMAIL_PORT = 587
+#EMAIL_USE_TLS = True
+EMAIL_PORT = 587
 
 ## The noreply address to be used as the sender for certain generated
 ## emails.  Messages sent to this address could contain sensitive user
@@ -141,7 +141,7 @@ EMAIL_GATEWAY_IMAP_FOLDER = "INBOX"
 ## initial realm and user.
 AUTHENTICATION_BACKENDS: Tuple[str, ...] = (
     "zproject.backends.EmailAuthBackend",  # Email and password; just requires SMTP setup
-    # 'zproject.backends.GoogleAuthBackend',  # Google auth, setup below
+    'zproject.backends.GoogleAuthBackend',  # Google auth, setup below
     # 'zproject.backends.GitHubAuthBackend',  # GitHub auth, setup below
     # 'zproject.backends.GitLabAuthBackend',  # GitLab auth, setup below
     # 'zproject.backends.AzureADAuthBackend',  # Microsoft Azure Active Directory auth, setup below
@@ -289,7 +289,7 @@ AUTH_LDAP_USER_ATTR_MAP = {
 ## (4) You should get a client ID and a client secret. Copy them.
 ## Use the client ID as `SOCIAL_AUTH_GOOGLE_KEY` here, and put the
 ## client secret in zulip-secrets.conf as `social_auth_google_secret`.
-# SOCIAL_AUTH_GOOGLE_KEY = <your client ID from Google>
+SOCIAL_AUTH_GOOGLE_KEY = "174174582806-3aoqla4st3v47p2ih2rjeg75bol0v2jo.apps.googleusercontent.com"
 
 ########
 ## GitLab OAuth.

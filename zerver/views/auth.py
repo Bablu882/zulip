@@ -4,6 +4,7 @@ import urllib
 from functools import wraps
 from typing import Any, Dict, List, Mapping, Optional, cast
 from urllib.parse import urlencode
+from django.contrib.auth import login as django_login
 
 import jwt
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -1051,3 +1052,17 @@ def config_error(request: HttpRequest, error_category_name: str) -> HttpResponse
     }
 
     return render(request, "zerver/config_error.html", contexts[error_category_name])
+
+
+@has_request_variables
+def auth_session_with_api_key(request: HttpRequest, user_profile: UserProfile,
+                              next: str=REQ(default='')) -> HttpResponse:
+    django_login(request, user_profile, 'zproject.backends.ZulipDummyBackend')
+
+    if next:
+        return HttpResponseRedirect(next)
+    else:
+        return HttpResponseRedirect('/')
+
+
+
