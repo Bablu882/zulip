@@ -1,12 +1,15 @@
 
 {% extends 'zerver/app/base.html' %}
+
 {% block content %}
+
+
 <div class="row">
     <div class="col-sm-4">
        <h4 class="text-centre alert alert-info">Add New User</h4>
        <form action="" method="POST">
         {{ csrf_input }}
-        {{form}}
+        {{ form}}
         <input type="submit" class="btn btn-danger" value="ADD NEW USER">
         </form>
 

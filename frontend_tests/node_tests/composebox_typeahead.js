@@ -180,6 +180,11 @@ const light_slash = {
     aliases: "day",
     text: "translated: /light (Switch to light theme)",
 };
+const diff_slash = {
+    name: "diff",
+    aliases: "diff",
+    text: "translated: /diff (Switch to diff theme)",
+};
 
 const sweden_stream = {
     name: "Sweden",
@@ -535,6 +540,20 @@ test("content_typeahead_selected", ({override_rewire}) => {
     actual_value = ct.content_typeahead_selected.call(fake_this, light_slash);
     expected_value = "/light ";
     assert.equal(actual_value, expected_value);
+    
+    fake_this.query = "/di";
+    fake_this.completing = "slash";
+    actual_value = ct.content_typeahead_selected.call(fake_this, diff_slash);
+    expected_value = "/diff ";
+    assert.equal(actual_value, expected_value);
+
+    fake_this.query = "/li";
+    fake_this.completing = "slash";
+    actual_value = ct.content_typeahead_selected.call(fake_this, diff_slash);
+    expected_value = "/diff ";
+    assert.equal(actual_value, expected_value);
+
+
 
     // stream
     fake_this.completing = "stream";
@@ -1000,8 +1019,8 @@ test("initialize", ({override, override_rewire, mock_template}) => {
         assert.deepEqual(actual_value, expected_value);
 
         fake_this = {completing: "slash", token: "da"};
-        actual_value = sort_items(fake_this, [dark_slash, light_slash]);
-        expected_value = [dark_slash, light_slash];
+        actual_value = sort_items(fake_this, [dark_slash, light_slash,diff_slash]);
+        expected_value = [dark_slash, light_slash,diff_slash];
         assert.deepEqual(actual_value, expected_value);
 
         fake_this = {completing: "stream", token: "de"};
@@ -1562,6 +1581,7 @@ test("typeahead_results", () => {
     assert_slash_matches("night", [dark_slash]);
     assert_slash_matches("light", [light_slash]);
     assert_slash_matches("day", [light_slash]);
+    assert_slash_matches("diff", [diff_slash]);
 
     // Autocomplete stream by stream name or stream description.
     assert_stream_matches("den", [denmark_stream, sweden_stream]);

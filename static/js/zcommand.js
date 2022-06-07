@@ -5,6 +5,7 @@ import marked from "../third/marked/lib/marked";
 import * as channel from "./channel";
 import * as common from "./common";
 import * as dark_theme from "./dark_theme";
+import * as diff_theme from "./diff_theme";
 import * as feedback_widget from "./feedback_widget";
 import {$t} from "./i18n";
 import * as scroll_bar from "./scroll_bar";
@@ -103,6 +104,28 @@ export function switch_to_dark_theme() {
     });
 }
 
+export function switch_to_diff_theme() {
+    send({
+        command: "/diff",
+        on_success(data) {
+            diff_theme.enable();
+            feedback_widget.show({
+                populate($container) {
+                    const rendered_msg = marked(data.msg).trim();
+                    $container.html(rendered_msg);
+                },
+                on_undo() {
+                    send({
+                        command: "/diff",
+                    });
+                },
+                title_text: $t({defaultMessage: "Diff theme"}),
+                undo_button_text: $t({defaultMessage: "Light theme"}),
+            });
+        },
+    });
+}
+
 export function enter_fluid_mode() {
     send({
         command: "/fluid-width",
@@ -175,6 +198,12 @@ export function process(message_content) {
     const night_commands = ["/night", "/dark"];
     if (night_commands.includes(content)) {
         switch_to_dark_theme();
+        return true;
+    }
+
+    const diff_commands = ["/diff", "/diff"];
+    if (night_commands.includes(content)) {
+        switch_to_diff_theme();
         return true;
     }
 

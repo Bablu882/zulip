@@ -54,6 +54,18 @@ def process_zcommands(content: str, user_profile: UserProfile) -> Dict[str, Any]
                 setting_value=UserProfile.COLOR_SCHEME_LIGHT,
             )
         )
+
+    elif command == "diff":
+        if user_profile.color_scheme == UserProfile.COLOR_SCHEME_DIFF:
+            return dict(msg="You are still in diff theme.")
+        return dict(
+            msg=change_mode_setting(
+                setting_name="light theme",
+                switch_command="diff",
+                setting="color_scheme",
+                setting_value=UserProfile.COLOR_SCHEME_DIFF,
+            )
+        )    
     elif command == "fluid-width":
         if user_profile.fluid_layout_width:
             return dict(msg="You are still in fluid width mode.")

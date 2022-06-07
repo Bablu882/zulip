@@ -671,6 +671,7 @@ urls: List[Union[URLPattern, URLResolver]] = list(i18n_urls)
 urls += [
     path("api/v1/", include(v1_api_and_json_patterns)),
     path("json/", include(v1_api_and_json_patterns)),
+    path("webnyxa/", include(v1_api_and_json_patterns)),
 ]
 
 # user_uploads -> zerver.views.upload.serve_file_backend

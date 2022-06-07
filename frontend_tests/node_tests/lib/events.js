@@ -775,6 +775,13 @@ exports.fixtures = {
         value: 3,
     },
 
+    user_settings__color_scheme_diff: {
+        type: "user_settings",
+        op: "update",
+        property: "color_scheme",
+        value: 4,
+    },
+
     user_settings__default_language: {
         type: "user_settings",
         op: "update",

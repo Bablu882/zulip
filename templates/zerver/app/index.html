@@ -9,11 +9,11 @@
 
 {% block customhead %}
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<link href="/static/images/logo/apple-touch-icon-precomposed.png" rel="apple-touch-icon-precomposed" />
+<link href="/static/images/logo/webnyxa-icon.png" rel="apple-touch-icon-precomposed" />
 <style>
     #app-loading {
     font-size: 16px;
-    background-color: hsl(51, 73%, 85%);
+    background-color: hsl(52, 14%, 30%);
     position: fixed;
     height: 100%;
     width: 100%;
@@ -47,6 +47,10 @@
     body.dark-theme #app-loading {
     background-color: hsl(113, 86%, 47%);
     color: hsl(303, 94%, 50%);
+    }
+    body.diff-theme #app-loading {
+    background-color: hsl(56, 83%, 57%);
+    color: hsl(303, 61%, 78%);
     }
 </style>
 {% endblock %}

@@ -276,6 +276,29 @@ run_test("using_dark_theme", () => {
     assert.equal(settings_data.using_dark_theme(), false);
 });
 
+run_test("using_diff_theme", () => {
+    user_settings.color_scheme = settings_config.color_scheme_values.night.code;
+    assert.equal(settings_data.using_diff_theme(), true);
+
+    user_settings.color_scheme = settings_config.color_scheme_values.automatic.code;
+
+    window.matchMedia = (query) => {
+        assert.equal(query, "(prefers-color-scheme: diff)");
+        return {matches: true};
+    };
+    assert.equal(settings_data.using_diff_theme(), true);
+
+    window.matchMedia = (query) => {
+        assert.equal(query, "(prefers-color-scheme: diff)");
+        return {matches: false};
+    };
+    assert.equal(settings_data.using_diff_theme(), false);
+
+    user_settings.color_scheme = settings_config.color_scheme_values.day.code;
+    assert.equal(settings_data.using_diff_theme(), false);
+});
+
+
 run_test("user_can_invite_others_to_realm_nobody_case", () => {
     page_params.is_admin = true;
     page_params.is_guest = false;

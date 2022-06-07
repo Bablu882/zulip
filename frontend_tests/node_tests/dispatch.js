@@ -30,6 +30,7 @@ const attachments_ui = mock_esm("../../static/js/attachments_ui");
 const bot_data = mock_esm("../../static/js/bot_data");
 const composebox_typeahead = mock_esm("../../static/js/composebox_typeahead");
 const dark_theme = mock_esm("../../static/js/dark_theme");
+const diff_theme = mock_esm("../../static/js/diff_theme");
 const emoji_picker = mock_esm("../../static/js/emoji_picker");
 const hotspots = mock_esm("../../static/js/hotspots");
 const linkifiers = mock_esm("../../static/js/linkifiers");
@@ -787,6 +788,16 @@ run_test("user_settings", ({override, override_rewire}) => {
         dispatch(event);
         assert.equal(stub.num_calls, 1);
         assert.equal(user_settings.color_scheme, 3);
+    }
+
+    {
+        const stub = make_stub();
+        event = event_fixtures.user_settings__color_scheme_diff;
+        user_settings.color_scheme = 1;
+        override(diff_theme, "enable", stub.f); // automatically checks if called
+        dispatch(event);
+        assert.equal(stub.num_calls, 1);
+        assert.equal(user_settings.color_scheme, 1);
     }
 
     {

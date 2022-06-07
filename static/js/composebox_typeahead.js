@@ -397,6 +397,13 @@ export const slash_commands = [
         aliases: "night",
     },
     {
+        text: $t({defaultMessage: "/diff (Switch to the diff theme)"}),
+        name: "diff",
+        aliases: "diff",
+    },
+
+
+    {
         text: $t({defaultMessage: "/fixed-width (Toggle fixed width mode)"}),
         name: "fixed-width",
         aliases: "",

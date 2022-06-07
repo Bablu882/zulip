@@ -15,6 +15,7 @@ import * as compose_fade from "./compose_fade";
 import * as compose_pm_pill from "./compose_pm_pill";
 import * as composebox_typeahead from "./composebox_typeahead";
 import * as dark_theme from "./dark_theme";
+import * as diff_theme from "./diff_theme";
 import * as emoji_picker from "./emoji_picker";
 import * as giphy from "./giphy";
 import * as hotspots from "./hotspots";
@@ -654,6 +655,16 @@ export function dispatch_normal_event(event) {
                         realm_logo.render();
                     } else {
                         dark_theme.default_preference_checker();
+                        realm_logo.render();
+                    }
+                    if (event.value === settings_config.color_scheme_values.diff.code) {
+                        diff_theme.enable();
+                        realm_logo.render();
+                    } else if (event.value === settings_config.color_scheme_values.day.code) {
+                        diff_theme.disable();
+                        realm_logo.render();
+                    } else {
+                        diff_theme.default_preference_checker();
                         realm_logo.render();
                     }
                     $("body").fadeIn(300);

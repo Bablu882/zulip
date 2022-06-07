@@ -156,7 +156,7 @@ DEVELOPMENT_LOG_DIRECTORY = os.path.join(DEPLOY_ROOT, "var", "log")
 USE_X_FORWARDED_HOST = True
 
 # Extend ALLOWED_HOSTS with localhost (needed to RPC to Tornado),
-ALLOWED_HOSTS += ["127.0.0.1", "localhost"]
+ALLOWED_HOSTS += ["127.0.0.1", "localhost",'webnyxa.dev']
 # ... with hosts corresponding to EXTERNAL_HOST,
 ALLOWED_HOSTS += [EXTERNAL_HOST_WITHOUT_PORT, "." + EXTERNAL_HOST_WITHOUT_PORT]
 # ... and with the hosts in REALM_HOSTS.
@@ -218,6 +218,7 @@ INSTALLED_APPS = [
     "django_otp.plugins.otp_static",
     "django_otp.plugins.otp_totp",
     "two_factor",
+    
     
     
 ]
@@ -1193,7 +1194,7 @@ if DEVELOPMENT:
     EMAIL_HOST = get_secret("email_host", "")
     EMAIL_PORT = int(get_secret("email_port", "25"))
     EMAIL_HOST_USER = get_secret("email_host_user", "")
-    EMAIL_USE_TLS = get_secret("email_use_tls", "") == "true"
+    EMAIL_USE_TLS = get_secret("email_use_tls", "") == "True"
 
 EMAIL_HOST_PASSWORD = get_secret("email_password")
 EMAIL_GATEWAY_PASSWORD = get_secret("email_gateway_password")

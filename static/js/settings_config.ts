@@ -58,6 +58,10 @@ export const color_scheme_values = {
         code: 3,
         description: $t({defaultMessage: "Light theme"}),
     },
+    diff: {
+        code: 4,
+        description: $t({defaultMessage: "Diff theme"}),
+    },
 };
 
 export const twenty_four_hour_time_values = {

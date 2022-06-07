@@ -2444,7 +2444,7 @@ class RealmPropertyActionTest(BaseAction):
             default_view=["recent_topics", "all_messages"],
             emojiset=[emojiset["key"] for emojiset in RealmUserDefault.emojiset_choices()],
             demote_inactive_streams=UserProfile.DEMOTE_STREAMS_CHOICES,
-            desktop_icon_count_display=[1, 2, 3],
+            desktop_icon_count_display=[1, 2, 3,4],
             notification_sound=["zulip", "ding"],
             email_notifications_batching_period_seconds=[120, 300],
         )

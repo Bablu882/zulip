@@ -52,6 +52,7 @@ import "../../styles/recent_topics.css";
 import "../../styles/typing_notifications.css";
 import "../../styles/hotspots.css";
 import "../../styles/dark_theme.css";
+import "../../styles/diff_theme.css";
 import "../../styles/user_status.css";
 import "../../styles/widgets.css";
 
