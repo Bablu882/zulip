@@ -336,7 +336,7 @@ p.n-margin {
         color: hsl(0, 0%, 100%);
 
         &.alert-info {
-            background-color: hsl(170, 46%, 54%);
+            background-color: hsl(160, 94%, 26%);
 
             &.red {
                 background-color: hsl(0, 46%, 54%);
@@ -352,7 +352,7 @@ p.n-margin {
         }
 
         .alert-link {
-            color: hsl(169, 100%, 88%);
+            color: hsl(180, 79%, 91%);
             font-weight: 600;
         }
 
@@ -385,7 +385,7 @@ p.n-margin {
     margin: 0 auto;
     padding: 0;
     position: relative;
-    background-color: hsl(173, 39%, 87%);
+    background-color: hsl(0, 0%, 100%);
 }
 
 .fixed-app {
@@ -588,7 +588,7 @@ strong {
 }
 
 .sidebar-title {
-    color: hsl(0, 0%, 43%);
+    color: hsl(0, 0%, 3%);
     font-size: inherit;
     font-weight: normal;
     display: inline;
