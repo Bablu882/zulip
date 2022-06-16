@@ -4,7 +4,7 @@ import logging
 import urllib
 from functools import wraps
 from io import BytesIO
-from typing import Callable, Dict, Optional, Sequence, Set, Tuple, TypeVar, Union, cast, overload
+from typing import Callable, Dict, Optional, Sequence, Set, TypeVar, Union, cast, overload
 
 import django_otp
 import orjson
@@ -24,6 +24,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
 from django_otp import user_has_device
 from two_factor.utils import default_device
+from typing_extensions import ParamSpec
 
 from zerver.lib.cache import cache_with_key
 from zerver.lib.exceptions import (
@@ -67,21 +68,8 @@ webhook_logger = logging.getLogger("zulip.zerver.webhooks")
 webhook_unsupported_events_logger = logging.getLogger("zulip.zerver.webhooks.unsupported")
 webhook_anomalous_payloads_logger = logging.getLogger("zulip.zerver.webhooks.anomalous")
 
-FuncT = TypeVar("FuncT", bound=Callable[..., object])
-
-
-def cachify(method: FuncT) -> FuncT:
-    dct: Dict[Tuple[object, ...], object] = {}
-
-    def cache_wrapper(*args: object) -> object:
-        tup = tuple(args)
-        if tup in dct:
-            return dct[tup]
-        result = method(*args)
-        dct[tup] = result
-        return result
-
-    return cast(FuncT, cache_wrapper)  # https://github.com/python/mypy/issues/1927
+ParamT = ParamSpec("ParamT")
+ReturnT = TypeVar("ReturnT")
 
 
 def update_user_activity(
@@ -649,6 +637,7 @@ def authenticated_rest_api_view(
     webhook_client_name: Optional[str] = None,
     allow_webhook_access: bool = False,
     skip_rate_limiting: bool = False,
+    beanstalk_email_decode: bool = False,
 ) -> Callable[[Callable[..., HttpResponse]], Callable[..., HttpResponse]]:
     if webhook_client_name is not None:
         allow_webhook_access = True
@@ -663,11 +652,15 @@ def authenticated_rest_api_view(
             try:
                 # Grab the base64-encoded authentication string, decode it, and split it into
                 # the email and API key
-                auth_type, credentials = request.META["HTTP_AUTHORIZATION"].split()
+                auth_type, credentials = request.headers["Authorization"].split()
                 # case insensitive per RFC 1945
                 if auth_type.lower() != "basic":
                     raise JsonableError(_("This endpoint requires HTTP basic authentication."))
                 role, api_key = base64.b64decode(credentials).decode().split(":")
+                if beanstalk_email_decode:
+                    # Beanstalk's web hook UI rejects URL with a @ in the username section
+                    # So we ask the user to replace them with %40
+                    role = role.replace("%40", "@")
             except ValueError:
                 return json_unauthorized(_("Invalid authorization header for basic auth"))
             except KeyError:
@@ -723,7 +716,7 @@ def process_as_post(view_func: ViewFuncT) -> ViewFuncT:
 
         if not request.POST:
             # Only take action if POST is empty.
-            if request.META.get("CONTENT_TYPE", "").startswith("multipart"):
+            if request.content_type == "multipart/form-data":
                 # Note that request._files is just the private attribute that backs the
                 # FILES property, so we are essentially setting request.FILES here.  (In
                 # Django 1.5 FILES was still a read-only property.)
@@ -861,20 +854,22 @@ def to_utc_datetime(var_name: str, timestamp: str) -> datetime.datetime:
     return timestamp_to_datetime(float(timestamp))
 
 
-def statsd_increment(counter: str, val: int = 1) -> Callable[[FuncT], FuncT]:
+def statsd_increment(
+    counter: str, val: int = 1
+) -> Callable[[Callable[ParamT, ReturnT]], Callable[ParamT, ReturnT]]:
     """Increments a statsd counter on completion of the
     decorated function.
 
     Pass the name of the counter to this decorator-returning function."""
 
-    def wrapper(func: FuncT) -> FuncT:
+    def wrapper(func: Callable[ParamT, ReturnT]) -> Callable[ParamT, ReturnT]:
         @wraps(func)
-        def wrapped_func(*args: object, **kwargs: object) -> object:
+        def wrapped_func(*args: ParamT.args, **kwargs: ParamT.kwargs) -> ReturnT:
             ret = func(*args, **kwargs)
             statsd.incr(counter, val)
             return ret
 
-        return cast(FuncT, wrapped_func)  # https://github.com/python/mypy/issues/1927
+        return wrapped_func
 
     return wrapper
 
@@ -893,7 +888,7 @@ def get_tor_ips() -> Set[str]:
     if not settings.RATE_LIMIT_TOR_TOGETHER:
         return set()
 
-    # Cron job in /etc/cron.d/fetch-for-exit-nodes fetches this
+    # Cron job in /etc/cron.d/fetch-tor-exit-nodes fetches this
     # hourly; we cache it in memcached to prevent going to disk on
     # every unauth'd request.  In case of failures to read, we
     # circuit-break so 2 failures cause a 10-minute backoff.

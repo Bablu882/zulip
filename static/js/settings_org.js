@@ -10,7 +10,7 @@ import * as channel from "./channel";
 import * as confirm_dialog from "./confirm_dialog";
 import {csrf_token} from "./csrf";
 import {DropdownListWidget} from "./dropdown_list_widget";
-import {$t, $t_html} from "./i18n";
+import {$t, $t_html, get_language_name} from "./i18n";
 import * as loading from "./loading";
 import * as overlays from "./overlays";
 import {page_params} from "./page_params";
@@ -114,6 +114,14 @@ export function get_organization_settings_options() {
         settings_config.invite_to_realm_policy_values,
     );
     return options;
+}
+
+export function get_org_type_dropdown_options() {
+    const current_org_type = page_params.realm_org_type;
+    if (current_org_type !== 0) {
+        return settings_config.defined_org_type_values;
+    }
+    return settings_config.all_org_type_values;
 }
 
 export function get_realm_time_limits_in_minutes(property) {
@@ -238,6 +246,7 @@ const simple_dropdown_properties = [
     "realm_wildcard_mention_policy",
     "realm_move_messages_between_streams_policy",
     "realm_edit_topic_policy",
+    "realm_org_type",
 ];
 
 function set_property_dropdown_value(property_name) {
@@ -492,6 +501,15 @@ function discard_property_element_changes(elem, for_realm_default_settings) {
         case "realm_default_code_block_language":
             default_code_language_widget.render(property_value);
             break;
+        case "realm_default_language":
+            $("#org-notifications .language_selection_widget .language_selection_button span").attr(
+                "data-language-code",
+                property_value,
+            );
+            $("#org-notifications .language_selection_widget .language_selection_button span").text(
+                get_language_name(property_value),
+            );
+            break;
         case "emojiset":
             // Because the emojiset widget has a unique radio button
             // structure, it needs custom reset code.
@@ -506,6 +524,15 @@ function discard_property_element_changes(elem, for_realm_default_settings) {
                 $("#realm-user-default-settings"),
                 realm_user_settings_defaults.email_notifications_batching_period_seconds,
             );
+            break;
+        case "realm_org_type":
+            set_input_element_value($elem, property_value);
+            // Remove 'unspecified' option (value=0) from realm_org_type
+            // dropdown menu options whenever page_params.realm_org_type
+            // returns another value.
+            if (property_value !== 0) {
+                $("#id_realm_org_type option[value=0]").remove();
+            }
             break;
         default:
             if (property_value !== undefined) {
@@ -738,6 +765,11 @@ function check_property_changed(elem, for_realm_default_settings) {
             changed_val = get_email_notification_batching_setting_element_value();
             break;
         }
+        case "realm_default_language":
+            changed_val = $(
+                "#org-notifications .language_selection_widget .language_selection_button span",
+            ).attr("data-language-code");
+            break;
         default:
             if (current_val !== undefined) {
                 changed_val = get_input_element_value($elem, typeof current_val);
@@ -780,11 +812,13 @@ export function init_dropdown_widgets() {
         value: page_params.realm_notifications_stream_id,
         ...notification_stream_options,
     });
+    notifications_stream_widget.setup();
     signup_notifications_stream_widget = new DropdownListWidget({
         widget_name: "realm_signup_notifications_stream_id",
         value: page_params.realm_signup_notifications_stream_id,
         ...notification_stream_options,
     });
+    signup_notifications_stream_widget.setup();
     default_code_language_widget = new DropdownListWidget({
         widget_name: "realm_default_code_block_language",
         data: Object.keys(pygments_data.langs).map((x) => ({
@@ -797,6 +831,7 @@ export function init_dropdown_widgets() {
         },
         default_text: $t({defaultMessage: "No language set"}),
     });
+    default_code_language_widget.setup();
 }
 
 export function register_save_discard_widget_handlers(
@@ -903,6 +938,9 @@ export function register_save_discard_widget_handlers(
                     signup_notifications_stream_widget.value(),
                     10,
                 );
+                data.default_language = $(
+                    "#org-notifications .language_selection_widget .language_selection_button span",
+                ).attr("data-language-code");
                 break;
             case "message_retention": {
                 const message_retention_setting_value = $(

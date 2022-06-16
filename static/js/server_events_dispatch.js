@@ -1,7 +1,5 @@
 import $ from "jquery";
 
-import * as emoji from "../shared/js/emoji";
-
 import * as activity from "./activity";
 import * as alert_words from "./alert_words";
 import * as alert_words_ui from "./alert_words_ui";
@@ -15,7 +13,7 @@ import * as compose_fade from "./compose_fade";
 import * as compose_pm_pill from "./compose_pm_pill";
 import * as composebox_typeahead from "./composebox_typeahead";
 import * as dark_theme from "./dark_theme";
-import * as diff_theme from "./diff_theme";
+import * as emoji from "./emoji";
 import * as emoji_picker from "./emoji_picker";
 import * as giphy from "./giphy";
 import * as hotspots from "./hotspots";
@@ -216,6 +214,7 @@ export function dispatch_normal_event(event) {
                 name: notifications.redraw_title,
                 name_changes_disabled: settings_account.update_name_change_display,
                 notifications_stream_id: noop,
+                org_type: noop,
                 private_message_policy: noop,
                 send_welcome_emails: noop,
                 message_content_allowed_in_email_notifications: noop,
@@ -225,6 +224,7 @@ export function dispatch_normal_event(event) {
                 video_chat_provider: compose.update_video_chat_button_display,
                 giphy_rating: giphy.update_giphy_rating,
                 waiting_period_threshold: noop,
+                want_advertise_in_communities_directory: noop,
                 wildcard_mention_policy: noop,
             };
             switch (event.op) {
@@ -608,6 +608,7 @@ export function dispatch_normal_event(event) {
                 "timezone",
                 "twenty_four_hour_time",
                 "translate_emoticons",
+                "display_emoji_reaction_users",
                 "starred_message_counts",
                 "send_stream_typing_notifications",
                 "send_private_typing_notifications",
@@ -698,6 +699,10 @@ export function dispatch_normal_event(event) {
                 // Rerender buddy list status emoji
                 activity.build_user_sidebar();
             }
+
+            if (event.property === "display_emoji_reaction_users") {
+                message_live_update.rerender_messages_view();
+            }
             if (event.property === "escape_navigates_to_default_view") {
                 $("#go-to-default-view-hotkey-help").toggleClass("notdisplayed", !event.value);
             }
@@ -758,6 +763,12 @@ export function dispatch_normal_event(event) {
                     break;
                 case "remove_members":
                     user_groups.remove_members(event.group_id, event.user_ids);
+                    break;
+                case "add_subgroups":
+                    user_groups.add_subgroups(event.group_id, event.direct_subgroup_ids);
+                    break;
+                case "remove_subgroups":
+                    user_groups.remove_subgroups(event.group_id, event.direct_subgroup_ids);
                     break;
                 case "update":
                     user_groups.update(event);

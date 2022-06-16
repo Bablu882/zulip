@@ -3,7 +3,7 @@ from typing import List, Optional
 from django.http import HttpRequest, HttpResponse
 from django.utils.translation import gettext as _
 
-from zerver.lib.actions import (
+from zerver.actions.message_flags import (
     do_mark_all_as_read,
     do_mark_stream_messages_as_read,
     do_update_message_flags,
@@ -82,6 +82,7 @@ def mark_topic_as_read(
     topic_name: str = REQ(),
 ) -> HttpResponse:
     stream, sub = access_stream_by_id(user_profile, stream_id)
+    assert stream.recipient_id is not None
 
     if topic_name:
         topic_exists = user_message_exists_for_topic(

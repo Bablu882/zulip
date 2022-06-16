@@ -2,10 +2,9 @@
 import re
 import string
 from functools import partial
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Protocol
 
 from django.http import HttpRequest, HttpResponse
-from typing_extensions import Protocol
 
 from zerver.decorator import log_unsupported_webhook_event, webhook_view
 from zerver.lib.exceptions import UnsupportedWebhookEventType
@@ -184,7 +183,7 @@ def get_type(request: HttpRequest, payload: WildValue) -> str:
         pull_request_template = "pull_request_{}"
         # Note that we only need the HTTP header to determine pullrequest events.
         # We rely on the payload itself to determine the other ones.
-        event_key = validate_extract_webhook_http_header(request, "X_EVENT_KEY", "BitBucket")
+        event_key = validate_extract_webhook_http_header(request, "X-Event-Key", "BitBucket")
         assert event_key is not None
         action = re.match("pullrequest:(?P<action>.*)$", event_key)
         if action:
@@ -192,7 +191,7 @@ def get_type(request: HttpRequest, payload: WildValue) -> str:
             if action_group in PULL_REQUEST_SUPPORTED_ACTIONS:
                 return pull_request_template.format(action_group)
     else:
-        event_key = validate_extract_webhook_http_header(request, "X_EVENT_KEY", "BitBucket")
+        event_key = validate_extract_webhook_http_header(request, "X-Event-Key", "BitBucket")
         if event_key == "repo:updated":
             return event_key
 

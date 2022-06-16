@@ -4,19 +4,15 @@ import os
 import subprocess
 from email import message_from_string
 from email.message import EmailMessage, MIMEPart
-from typing import Any, Callable, Dict, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Mapping, Optional
 from unittest import mock
 
 import orjson
 from django.conf import settings
-from django.http import HttpResponse
 
-from zerver.lib.actions import (
-    do_change_stream_post_policy,
-    do_deactivate_realm,
-    do_deactivate_user,
-    ensure_stream,
-)
+from zerver.actions.realm_settings import do_deactivate_realm
+from zerver.actions.streams import do_change_stream_post_policy
+from zerver.actions.users import do_deactivate_user
 from zerver.lib.email_mirror import (
     create_missed_message_address,
     filter_footer,
@@ -37,6 +33,7 @@ from zerver.lib.email_mirror_helpers import (
 )
 from zerver.lib.email_notifications import convert_html_to_markdown
 from zerver.lib.send_email import FromAddress
+from zerver.lib.streams import ensure_stream
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.test_helpers import mock_queue_publish, most_recent_message, most_recent_usermessage
 from zerver.models import (
@@ -51,6 +48,9 @@ from zerver.models import (
     get_system_bot,
 )
 from zerver.worker.queue_processors import MirrorWorker
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
 
 logger_name = "zerver.lib.email_mirror"
 
@@ -569,6 +569,7 @@ class TestEmailMirrorMessagesWithAttachments(ZulipTestCase):
 
         message = most_recent_message(user_profile)
         attachment = Attachment.objects.last()
+        assert attachment is not None
         self.assertEqual(list(attachment.messages.values_list("id", flat=True)), [message.id])
         self.assertEqual(
             message.sender, get_system_bot(settings.EMAIL_GATEWAY_BOT, stream.realm_id)
@@ -1358,7 +1359,7 @@ class TestEmailMirrorTornadoView(ZulipTestCase):
         user_message = most_recent_usermessage(user_profile)
         return create_missed_message_address(user_profile, user_message.message)
 
-    def send_offline_message(self, to_address: str, sender: UserProfile) -> HttpResponse:
+    def send_offline_message(self, to_address: str, sender: UserProfile) -> "TestHttpResponse":
         mail_template = self.fixture_data("simple.txt", type="email")
         mail = mail_template.format(stream_to_address=to_address, sender=sender.delivery_email)
         msg_base64 = base64.b64encode(mail.encode()).decode()
@@ -1479,6 +1480,31 @@ class TestContentTypeUnspecifiedCharset(ZulipTestCase):
         message_as_string = self.fixture_data("1.txt", type="email")
         message_as_string = message_as_string.replace(
             'Content-Type: text/plain; charset="us-ascii"', "Content-Type: text/plain"
+        )
+        incoming_message = message_from_string(message_as_string, policy=email.policy.default)
+        # https://github.com/python/typeshed/issues/2417
+        assert isinstance(incoming_message, EmailMessage)
+
+        user_profile = self.example_user("hamlet")
+        self.login_user(user_profile)
+        self.subscribe(user_profile, "Denmark")
+        stream = get_stream("Denmark", user_profile.realm)
+        stream_to_address = encode_email_address(stream)
+
+        del incoming_message["To"]
+        incoming_message["To"] = stream_to_address
+        process_message(incoming_message)
+        message = most_recent_message(user_profile)
+
+        self.assertEqual(message.content, "Email fixture 1.txt body")
+
+
+class TestContentTypeInvalidCharset(ZulipTestCase):
+    def test_unknown_charset(self) -> None:
+        message_as_string = self.fixture_data("1.txt", type="email")
+        message_as_string = message_as_string.replace(
+            'Content-Type: text/plain; charset="us-ascii"',
+            'Content-Type: text/plain; charset="bogus"',
         )
         incoming_message = message_from_string(message_as_string, policy=email.policy.default)
         # https://github.com/python/typeshed/issues/2417

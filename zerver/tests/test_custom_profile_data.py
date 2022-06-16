@@ -3,7 +3,7 @@ from unittest import mock
 
 import orjson
 
-from zerver.lib.actions import (
+from zerver.actions.custom_profile_fields import (
     do_remove_realm_custom_profile_field,
     do_update_user_custom_profile_data_if_changed,
     try_add_realm_custom_profile_field,
@@ -145,6 +145,15 @@ class CreateCustomProfileFieldTest(CustomProfileFieldTestCase):
 
         data["field_data"] = orjson.dumps(
             {
+                "python": {"text": "Duplicate", "order": "1"},
+                "java": {"text": "Duplicate", "order": "2"},
+            }
+        ).decode()
+        result = self.client_post("/json/realm/profile_fields", info=data)
+        self.assert_json_error(result, "Field must not have duplicate choices.")
+
+        data["field_data"] = orjson.dumps(
+            {
                 "python": {"text": "Python", "order": "1"},
                 "java": {"text": "Java", "order": "2"},
             }
@@ -281,7 +290,7 @@ class CreateCustomProfileFieldTest(CustomProfileFieldTestCase):
             }
         ).decode()
         result = self.client_post("/json/realm/profile_fields", info=data)
-        self.assert_json_error(result, "Malformed URL pattern.")
+        self.assert_json_error(result, "URL pattern must contain '%(username)s'.")
 
         data["field_data"] = orjson.dumps(
             {
@@ -290,7 +299,7 @@ class CreateCustomProfileFieldTest(CustomProfileFieldTestCase):
             }
         ).decode()
         result = self.client_post("/json/realm/profile_fields", info=data)
-        self.assert_json_error(result, "Malformed URL pattern.")
+        self.assert_json_error(result, "URL pattern must contain '%(username)s'.")
 
         data["field_data"] = orjson.dumps(
             {
@@ -415,21 +424,21 @@ class UpdateCustomProfileFieldTest(CustomProfileFieldTestCase):
         realm = get_realm("zulip")
         result = self.client_patch(
             "/json/realm/profile_fields/100",
-            info={"name": "Phone number", "field_type": CustomProfileField.SHORT_TEXT},
+            info={"name": "Phone number"},
         )
         self.assert_json_error(result, "Field id 100 not found.")
 
         field = CustomProfileField.objects.get(name="Phone number", realm=realm)
         result = self.client_patch(
             f"/json/realm/profile_fields/{field.id}",
-            info={"name": "", "field_type": CustomProfileField.SHORT_TEXT},
+            info={"name": ""},
         )
         self.assert_json_error(result, "Label cannot be blank.")
 
         self.assertEqual(CustomProfileField.objects.count(), self.original_count)
         result = self.client_patch(
             f"/json/realm/profile_fields/{field.id}",
-            info={"name": "New phone number", "field_type": CustomProfileField.SHORT_TEXT},
+            info={"name": "New phone number"},
         )
         self.assert_json_success(result)
         field = CustomProfileField.objects.get(id=field.id, realm=realm)
@@ -440,7 +449,7 @@ class UpdateCustomProfileFieldTest(CustomProfileFieldTestCase):
 
         result = self.client_patch(
             f"/json/realm/profile_fields/{field.id}",
-            info={"name": "*" * 41, "field_type": CustomProfileField.SHORT_TEXT},
+            info={"name": "*" * 41},
         )
         msg = "name is too long (limit: 40 characters)"
         self.assert_json_error(result, msg)
@@ -450,7 +459,6 @@ class UpdateCustomProfileFieldTest(CustomProfileFieldTestCase):
             info={
                 "name": "New phone number",
                 "hint": "*" * 81,
-                "field_type": CustomProfileField.SHORT_TEXT,
             },
         )
         msg = "hint is too long (limit: 80 characters)"
@@ -461,7 +469,6 @@ class UpdateCustomProfileFieldTest(CustomProfileFieldTestCase):
             info={
                 "name": "New phone number",
                 "hint": "New contact number",
-                "field_type": CustomProfileField.SHORT_TEXT,
             },
         )
         self.assert_json_success(result)
@@ -474,7 +481,7 @@ class UpdateCustomProfileFieldTest(CustomProfileFieldTestCase):
 
         result = self.client_patch(
             f"/json/realm/profile_fields/{field.id}",
-            info={"name": "Name ", "field_type": CustomProfileField.SHORT_TEXT},
+            info={"name": "Name "},
         )
         self.assert_json_success(result)
         field.refresh_from_db()
@@ -525,7 +532,7 @@ class UpdateCustomProfileFieldTest(CustomProfileFieldTestCase):
         self.assertTrue(self.custom_field_exists_in_realm(field_2.id))
         result = self.client_patch(
             f"/json/realm/profile_fields/{field_2.id}",
-            info={"name": "Phone", "field_type": CustomProfileField.SHORT_TEXT},
+            info={"name": "Phone"},
         )
         self.assert_json_error(result, "A field with that label already exists.")
 
@@ -711,7 +718,9 @@ class UpdateCustomProfileFieldTest(CustomProfileFieldTestCase):
         ]
         do_update_user_custom_profile_data_if_changed(iago, data)
 
-        with mock.patch("zerver.lib.actions.notify_user_update_custom_profile_data") as mock_notify:
+        with mock.patch(
+            "zerver.actions.custom_profile_fields.notify_user_update_custom_profile_data"
+        ) as mock_notify:
             # Attempting to "update" the field value, when it wouldn't actually change,
             # shouldn't trigger notify.
             do_update_user_custom_profile_data_if_changed(iago, data)
@@ -722,9 +731,8 @@ class ListCustomProfileFieldTest(CustomProfileFieldTestCase):
     def test_list(self) -> None:
         self.login("iago")
         result = self.client_get("/json/realm/profile_fields")
-        self.assert_json_success(result)
+        content = self.assert_json_success(result)
         self.assertEqual(200, result.status_code)
-        content = result.json()
         self.assert_length(content["custom_fields"], self.original_count)
 
     def test_list_order(self) -> None:
@@ -737,7 +745,7 @@ class ListCustomProfileFieldTest(CustomProfileFieldTestCase):
         )
         try_reorder_realm_custom_profile_fields(realm, order)
         result = self.client_get("/json/realm/profile_fields")
-        content = result.json()
+        content = self.assert_json_success(result)
         self.assertListEqual(
             content["custom_fields"], sorted(content["custom_fields"], key=lambda x: -x["id"])
         )
@@ -755,8 +763,7 @@ class ListCustomProfileFieldTest(CustomProfileFieldTestCase):
 
         self.assert_length(queries, 4)
 
-        self.assertEqual(response.status_code, 200)
-        raw_users_data = response.json()["members"]
+        raw_users_data = self.assert_json_success(response)["members"]
 
         iago_raw_data = None
         test_bot_raw_data = None
@@ -817,8 +824,7 @@ class ListCustomProfileFieldTest(CustomProfileFieldTestCase):
         self.assertEqual(test_bot_raw_data["bot_owner_id"], iago_raw_data["user_id"])
 
         response = self.client_get("/json/users", {"client_gravatar": "false"})
-        self.assertEqual(response.status_code, 200)
-        raw_users_data = response.json()["members"]
+        raw_users_data = self.assert_json_success(response)["members"]
         for user_dict in raw_users_data:
             with self.assertRaises(KeyError):
                 user_dict["profile_data"]
@@ -849,8 +855,7 @@ class ListCustomProfileFieldTest(CustomProfileFieldTestCase):
 
         url = "/json/users/me"
         response = self.client_get(url)
-        self.assertEqual(response.status_code, 200)
-        raw_user_data = response.json()
+        raw_user_data = self.assert_json_success(response)
         self.assertEqual(set(raw_user_data.keys()), expected_keys)
 
 

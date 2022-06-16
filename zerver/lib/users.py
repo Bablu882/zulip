@@ -1,7 +1,7 @@
 import re
 import unicodedata
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Sequence, Union, cast
+from typing import Any, Dict, List, Optional, Sequence, TypedDict, Union, cast
 
 import dateutil.parser as date_parser
 from django.conf import settings
@@ -9,7 +9,6 @@ from django.core.exceptions import ValidationError
 from django.db.models.query import QuerySet
 from django.forms.models import model_to_dict
 from django.utils.translation import gettext as _
-from typing_extensions import TypedDict
 from zulip_bots.custom_exceptions import ConfigValidationError
 
 from zerver.lib.avatar import avatar_url, get_avatar_field
@@ -395,12 +394,16 @@ def validate_user_custom_profile_data(
             raise JsonableError(error.message)
 
 
-def can_access_delivery_email(user_profile: UserProfile) -> bool:
-    realm = user_profile.realm
-    if realm.email_address_visibility == Realm.EMAIL_ADDRESS_VISIBILITY_ADMINS:
+def can_access_delivery_email(
+    user_profile: UserProfile, target_user_id: int, email_address_visibility: int
+) -> bool:
+    if target_user_id == user_profile.id:
+        return True
+
+    if email_address_visibility == Realm.EMAIL_ADDRESS_VISIBILITY_ADMINS:
         return user_profile.is_realm_admin
 
-    if realm.email_address_visibility == Realm.EMAIL_ADDRESS_VISIBILITY_MODERATORS:
+    if email_address_visibility == Realm.EMAIL_ADDRESS_VISIBILITY_MODERATORS:
         return user_profile.is_realm_admin or user_profile.is_moderator
 
     return False
@@ -478,7 +481,9 @@ def format_user_row(
             client_gravatar=client_gravatar,
         )
 
-    if acting_user is not None and can_access_delivery_email(acting_user):
+    if acting_user is not None and can_access_delivery_email(
+        acting_user, row["id"], realm.email_address_visibility
+    ):
         result["delivery_email"] = row["delivery_email"]
 
     if is_bot:
@@ -611,3 +616,7 @@ def get_raw_user_data(
             custom_profile_field_data=custom_profile_field_data,
         )
     return result
+
+
+def get_active_bots_owned_by_user(user_profile: UserProfile) -> QuerySet:
+    return UserProfile.objects.filter(is_bot=True, is_active=True, bot_owner=user_profile)

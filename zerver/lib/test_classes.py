@@ -8,6 +8,7 @@ import urllib
 from contextlib import contextmanager
 from datetime import timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Collection,
@@ -47,25 +48,22 @@ from fakeldap import MockLDAP
 from two_factor.models import PhoneDevice
 
 from corporate.models import Customer, CustomerPlan, LicenseLedger
+from zerver.actions.message_send import check_send_message, check_send_stream_message
+from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.streams import bulk_add_subscriptions, bulk_remove_subscriptions
 from zerver.decorator import do_two_factor_login
-from zerver.lib.actions import (
-    bulk_add_subscriptions,
-    bulk_remove_subscriptions,
-    check_send_message,
-    check_send_stream_message,
-    do_set_realm_property,
-    gather_subscriptions,
-)
 from zerver.lib.cache import bounce_key_prefix_for_testing
 from zerver.lib.initial_password import initial_password
 from zerver.lib.notification_data import UserMessageNotificationsData
 from zerver.lib.rate_limiter import bounce_redis_key_prefix_for_testing
 from zerver.lib.sessions import get_session_dict_user
+from zerver.lib.soft_deactivation import do_soft_deactivate_users
 from zerver.lib.stream_subscription import get_stream_subscriptions_for_user
 from zerver.lib.streams import (
     create_stream_if_needed,
     get_default_value_for_history_public_to_subscribers,
 )
+from zerver.lib.subscription_info import gather_subscriptions
 from zerver.lib.test_console_output import (
     ExtraConsoleOutputFinder,
     ExtraConsoleOutputInTestException,
@@ -73,6 +71,7 @@ from zerver.lib.test_console_output import (
     tee_stdout_and_find_extra_console_output,
 )
 from zerver.lib.test_helpers import find_key_by_email, instrument_url
+from zerver.lib.topic import filter_by_topic_name_via_message
 from zerver.lib.user_groups import get_system_user_group_for_user
 from zerver.lib.users import get_api_key
 from zerver.lib.validator import check_string
@@ -109,6 +108,9 @@ from zerver.tornado.event_queue import clear_client_event_queues_for_testing
 
 if settings.ZILENCER_ENABLED:
     from zilencer.models import get_remote_server_by_uuid
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
 
 
 class EmptyResponseError(Exception):
@@ -256,7 +258,7 @@ Output:
         self,
         url: str,
         method: str,
-        result: HttpResponse,
+        result: "TestHttpResponse",
         data: Union[str, bytes, Dict[str, Any]],
         kwargs: Dict[str, ClientArg],
         intentionally_undocumented: bool = False,
@@ -304,7 +306,7 @@ Output:
         info: Dict[str, Any] = {},
         intentionally_undocumented: bool = False,
         **kwargs: ClientArg,
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         """
         We need to urlencode, since Django's function won't do it for us.
         """
@@ -325,7 +327,7 @@ Output:
     @instrument_url
     def client_patch_multipart(
         self, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         """
         Use this for patch requests that have file uploads or
         that need some sort of multi-part content.  In the future
@@ -343,20 +345,24 @@ Output:
 
     def json_patch(
         self, url: str, payload: Dict[str, Any] = {}, **kwargs: ClientArg
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         data = orjson.dumps(payload)
         django_client = self.client  # see WRAPPER_COMMENT
         self.set_http_headers(kwargs)
         return django_client.patch(url, data=data, content_type="application/json", **kwargs)
 
     @instrument_url
-    def client_put(self, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg) -> HttpResponse:
+    def client_put(
+        self, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg
+    ) -> "TestHttpResponse":
         encoded = urllib.parse.urlencode(info)
         django_client = self.client  # see WRAPPER_COMMENT
         self.set_http_headers(kwargs)
         return django_client.put(url, encoded, **kwargs)
 
-    def json_put(self, url: str, payload: Dict[str, Any] = {}, **kwargs: ClientArg) -> HttpResponse:
+    def json_put(
+        self, url: str, payload: Dict[str, Any] = {}, **kwargs: ClientArg
+    ) -> "TestHttpResponse":
         data = orjson.dumps(payload)
         django_client = self.client  # see WRAPPER_COMMENT
         self.set_http_headers(kwargs)
@@ -365,7 +371,7 @@ Output:
     @instrument_url
     def client_delete(
         self, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         encoded = urllib.parse.urlencode(info)
         django_client = self.client  # see WRAPPER_COMMENT
         self.set_http_headers(kwargs)
@@ -376,14 +382,16 @@ Output:
     @instrument_url
     def client_options(
         self, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         encoded = urllib.parse.urlencode(info)
         django_client = self.client  # see WRAPPER_COMMENT
         self.set_http_headers(kwargs)
         return django_client.options(url, encoded, **kwargs)
 
     @instrument_url
-    def client_head(self, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg) -> HttpResponse:
+    def client_head(
+        self, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg
+    ) -> "TestHttpResponse":
         encoded = urllib.parse.urlencode(info)
         django_client = self.client  # see WRAPPER_COMMENT
         self.set_http_headers(kwargs)
@@ -395,7 +403,7 @@ Output:
         url: str,
         info: Union[str, bytes, Dict[str, Any]] = {},
         **kwargs: ClientArg,
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         intentionally_undocumented = kwargs.pop("intentionally_undocumented", False)
         assert isinstance(intentionally_undocumented, bool)
         django_client = self.client  # see WRAPPER_COMMENT
@@ -407,7 +415,7 @@ Output:
         return result
 
     @instrument_url
-    def client_post_request(self, url: str, req: Any) -> HttpResponse:
+    def client_post_request(self, url: str, req: Any) -> "TestHttpResponse":
         """
         We simulate hitting an endpoint here, although we
         actually resolve the URL manually and hit the view
@@ -421,7 +429,9 @@ Output:
         return match.func(req)
 
     @instrument_url
-    def client_get(self, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg) -> HttpResponse:
+    def client_get(
+        self, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg
+    ) -> "TestHttpResponse":
         intentionally_undocumented = kwargs.pop("intentionally_undocumented", False)
         assert isinstance(intentionally_undocumented, bool)
         django_client = self.client  # see WRAPPER_COMMENT
@@ -541,7 +551,7 @@ Output:
         result = self.client_post("/json/bots", bot_info)
         self.assert_json_error(result, assert_json_error_msg)
 
-    def _get_page_params(self, result: HttpResponse) -> Dict[str, Any]:
+    def _get_page_params(self, result: "TestHttpResponse") -> Dict[str, Any]:
         """Helper for parsing page_params after fetching the web app's home view."""
         doc = lxml.html.document_fromstring(result.content)
         div = cast(lxml.html.HtmlMixin, doc).get_element_by_id("page-params")
@@ -551,7 +561,7 @@ Output:
         page_params = orjson.loads(page_params_json)
         return page_params
 
-    def check_rendered_logged_in_app(self, result: HttpResponse) -> None:
+    def check_rendered_logged_in_app(self, result: "TestHttpResponse") -> None:
         """Verifies that a visit of / was a 200 that rendered page_params
         and not for a (logged-out) spectator."""
         self.assertEqual(result.status_code, 200)
@@ -563,7 +573,7 @@ Output:
 
     def login_with_return(
         self, email: str, password: Optional[str] = None, **kwargs: ClientArg
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         if password is None:
             password = initial_password(email)
         result = self.client_post(
@@ -640,7 +650,7 @@ Output:
     def logout(self) -> None:
         self.client.logout()
 
-    def register(self, email: str, password: str, **kwargs: Any) -> HttpResponse:
+    def register(self, email: str, password: str, **kwargs: Any) -> "TestHttpResponse":
         self.client_post("/accounts/home/", {"email": email}, **kwargs)
         return self.submit_reg_form_for_user(email, password, **kwargs)
 
@@ -661,7 +671,7 @@ Output:
         enable_marketing_emails: Optional[bool] = None,
         is_demo_organization: bool = False,
         **kwargs: ClientArg,
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         """
         Stage two of the two-step registration process.
 
@@ -758,7 +768,7 @@ Output:
 
     def uuid_get(
         self, identifier: str, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         kwargs["HTTP_AUTHORIZATION"] = self.encode_uuid(identifier)
         return self.client_get(url, info, **kwargs)
 
@@ -768,13 +778,13 @@ Output:
         url: str,
         info: Union[str, bytes, Dict[str, Any]] = {},
         **kwargs: ClientArg,
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         kwargs["HTTP_AUTHORIZATION"] = self.encode_uuid(identifier)
         return self.client_post(url, info, **kwargs)
 
     def api_get(
         self, user: UserProfile, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         kwargs["HTTP_AUTHORIZATION"] = self.encode_user(user)
         return self.client_get(url, info, **kwargs)
 
@@ -784,7 +794,7 @@ Output:
         url: str,
         info: Union[str, bytes, Dict[str, Any]] = {},
         **kwargs: ClientArg,
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         kwargs["HTTP_AUTHORIZATION"] = self.encode_user(user)
         return self.client_post(url, info, **kwargs)
 
@@ -795,7 +805,7 @@ Output:
         info: Dict[str, Any] = {},
         intentionally_undocumented: bool = False,
         **kwargs: ClientArg,
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         kwargs["HTTP_AUTHORIZATION"] = self.encode_user(user)
         return self.client_patch(
             url, info, intentionally_undocumented=intentionally_undocumented, **kwargs
@@ -803,7 +813,7 @@ Output:
 
     def api_delete(
         self, user: UserProfile, url: str, info: Dict[str, Any] = {}, **kwargs: ClientArg
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         kwargs["HTTP_AUTHORIZATION"] = self.encode_user(user)
         return self.client_delete(url, info, **kwargs)
 
@@ -929,12 +939,14 @@ Output:
 
         return [subscription.user_profile for subscription in subscriptions]
 
-    def assert_streaming_content(self, response: HttpResponse, result: bytes) -> None:
+    def assert_streaming_content(self, response: "TestHttpResponse", result: bytes) -> None:
         assert isinstance(response, StreamingHttpResponse)
         data = b"".join(response.streaming_content)
         self.assertEqual(result, data)
 
-    def assert_json_success(self, result: HttpResponse) -> Dict[str, Any]:
+    def assert_json_success(
+        self, result: Union["TestHttpResponse", HttpResponse]
+    ) -> Dict[str, Any]:
         """
         Successful POSTs return a 200 and JSON of the form {"result": "success",
         "msg": ""}.
@@ -951,7 +963,7 @@ Output:
         self.assertNotEqual(json["msg"], "Error parsing JSON in response!")
         return json
 
-    def get_json_error(self, result: HttpResponse, status_code: int = 400) -> str:
+    def get_json_error(self, result: "TestHttpResponse", status_code: int = 400) -> str:
         try:
             json = orjson.loads(result.content)
         except orjson.JSONDecodeError:  # nocoverage
@@ -960,7 +972,9 @@ Output:
         self.assertEqual(json.get("result"), "error")
         return json["msg"]
 
-    def assert_json_error(self, result: HttpResponse, msg: str, status_code: int = 400) -> None:
+    def assert_json_error(
+        self, result: "TestHttpResponse", msg: str, status_code: int = 400
+    ) -> None:
         """
         Invalid POSTs return an error status code and JSON of the form
         {"result": "error", "msg": "reason"}.
@@ -977,20 +991,26 @@ Output:
             raise AssertionError(f"{str(type(items))} is of unexpected size!")
 
     def assert_json_error_contains(
-        self, result: HttpResponse, msg_substring: str, status_code: int = 400
+        self, result: "TestHttpResponse", msg_substring: str, status_code: int = 400
     ) -> None:
         self.assertIn(msg_substring, self.get_json_error(result, status_code=status_code))
 
-    def assert_in_response(self, substring: str, response: HttpResponse) -> None:
+    def assert_in_response(
+        self, substring: str, response: Union["TestHttpResponse", HttpResponse]
+    ) -> None:
         self.assertIn(substring, response.content.decode())
 
-    def assert_in_success_response(self, substrings: List[str], response: HttpResponse) -> None:
+    def assert_in_success_response(
+        self, substrings: List[str], response: "TestHttpResponse"
+    ) -> None:
         self.assertEqual(response.status_code, 200)
         decoded = response.content.decode()
         for substring in substrings:
             self.assertIn(substring, decoded)
 
-    def assert_not_in_success_response(self, substrings: List[str], response: HttpResponse) -> None:
+    def assert_not_in_success_response(
+        self, substrings: List[str], response: "TestHttpResponse"
+    ) -> None:
         self.assertEqual(response.status_code, 200)
         decoded = response.content.decode()
         for substring in substrings:
@@ -1095,7 +1115,7 @@ Output:
         is_web_public: bool = False,
         allow_fail: bool = False,
         **kwargs: ClientArg,
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         post_data = {
             "subscriptions": orjson.dumps([{"name": stream} for stream in streams]).decode(),
             "is_web_public": orjson.dumps(is_web_public).decode(),
@@ -1527,6 +1547,24 @@ Output:
             UserGroupMembership.objects.filter(user_profile=user, user_group=user_group).exists()
         )
 
+    @contextmanager
+    def soft_deactivate_and_check_long_term_idle(
+        self, user: UserProfile, expected: bool
+    ) -> Iterator[None]:
+        """
+        Ensure that the user is soft deactivated (long term idle), and check if the user
+        has been reactivated when exiting the context with an assertion
+        """
+        if not user.long_term_idle:
+            do_soft_deactivate_users([user])
+            self.assertTrue(user.long_term_idle)
+        try:
+            yield
+        finally:
+            # Prevent from using the old user object
+            user.refresh_from_db()
+            self.assertEqual(user.long_term_idle, expected)
+
 
 class WebhookTestCase(ZulipTestCase):
     """Shared test class for all incoming webhooks tests.
@@ -1621,7 +1659,7 @@ You can fix this by adding "{complete_event_type}" to ALL_EVENT_TYPES for this w
         content_type: Optional[str] = "application/json",
         expect_noop: bool = False,
         **kwargs: ClientArg,
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         kwargs["HTTP_AUTHORIZATION"] = self.encode_user(user)
         return self.check_webhook(
             fixture_name, expected_topic, expected_message, content_type, expect_noop, **kwargs
@@ -1820,3 +1858,11 @@ class MigrationsTestCase(ZulipTestCase):  # nocoverage
 
     def setUpBeforeMigration(self, apps: StateApps) -> None:
         pass  # nocoverage
+
+
+def get_topic_messages(user_profile: UserProfile, stream: Stream, topic_name: str) -> List[Message]:
+    query = UserMessage.objects.filter(
+        user_profile=user_profile,
+        message__recipient=stream.recipient,
+    ).order_by("id")
+    return [um.message for um in filter_by_topic_name_via_message(query, topic_name)]

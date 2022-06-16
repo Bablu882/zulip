@@ -8,8 +8,8 @@ from django.http import HttpRequest, HttpResponse
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
+from zerver.actions.message_edit import check_update_message, do_delete_messages
 from zerver.context_processors import get_valid_realm_from_request
-from zerver.lib.actions import check_update_message, do_delete_messages
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.html_diff import highlight_html_differences
 from zerver.lib.message import access_message, access_web_public_message, messages_for_ids
@@ -205,6 +205,8 @@ def json_fetch_raw_message(
     else:
         if user_message:
             flags = user_message.flags_list()
+        else:
+            flags = ["read", "historical"]
         allow_edit_history = maybe_user_profile.realm.allow_edit_history
 
     # Security note: It's important that we call this only with a

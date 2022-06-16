@@ -3,7 +3,6 @@ import _ from "lodash";
 
 import generated_emoji_codes from "../generated/emoji/emoji_codes.json";
 import generated_pygments_data from "../generated/pygments_data.json";
-import * as emoji from "../shared/js/emoji";
 import * as fenced_code from "../shared/js/fenced_code";
 import render_compose from "../templates/compose.hbs";
 import render_edit_content_button from "../templates/edit_content_button.hbs";
@@ -17,6 +16,7 @@ import * as activity from "./activity";
 import * as alert_words from "./alert_words";
 import * as blueslip from "./blueslip";
 import * as bot_data from "./bot_data";
+import * as channel from "./channel";
 import * as click_handlers from "./click_handlers";
 import * as common from "./common";
 import * as compose from "./compose";
@@ -28,6 +28,7 @@ import * as copy_and_paste from "./copy_and_paste";
 import * as dark_theme from "./dark_theme";
 import * as drafts from "./drafts";
 import * as echo from "./echo";
+import * as emoji from "./emoji";
 import * as emoji_picker from "./emoji_picker";
 import * as emojisets from "./emojisets";
 import * as gear_menu from "./gear_menu";
@@ -157,7 +158,7 @@ function initialize_left_sidebar() {
 function initialize_right_sidebar() {
     const rendered_sidebar = render_right_sidebar({
         can_invite_others_to_realm: settings_data.user_can_invite_others_to_realm(),
-        realm_description: page_params.realm_description,
+        realm_rendered_description: page_params.realm_rendered_description,
     });
 
     $("#right-sidebar-container").html(rendered_sidebar);
@@ -206,6 +207,8 @@ function initialize_compose_box() {
             scroll_to_bottom_key_html: common.has_mac_keyboard()
                 ? "Fn + <span class='tooltip_right_arrow'>→</span>"
                 : "End",
+            narrow_to_compose_recipients_key_html:
+                (common.has_mac_keyboard() ? "⌘" : "Ctrl") + " + .",
         }),
     );
     $(`.enter_sends_${user_settings.enter_sends}`).show();
@@ -239,7 +242,7 @@ export function initialize_kitchen_sink_stuff() {
 
     message_viewport.$message_pane.on("wheel", (e) => {
         const delta = e.originalEvent.deltaY;
-        if (!overlays.is_active() && !recent_topics_util.is_visible()) {
+        if (!overlays.is_overlay_or_modal_open() && !recent_topics_util.is_visible()) {
             // In the message view, we use a throttled mousewheel handler.
             throttled_mousewheelhandler(e, delta);
         }
@@ -677,9 +680,29 @@ export function initialize_everything() {
     user_status_ui.initialize();
     fenced_code.initialize(generated_pygments_data);
     message_edit_history.initialize();
+
+    $("#app-loading").addClass("loaded");
 }
 
-$(() => {
+$(async () => {
+    if (page_params.is_spectator) {
+        const data = {
+            apply_markdown: true,
+            client_capabilities: JSON.stringify({
+                notification_settings_null: true,
+                bulk_message_deletion: true,
+                user_avatar_url_field_optional: true,
+                // Set this to true when stream typing notifications are implemented.
+                stream_typing_notifications: false,
+                user_settings_object: true,
+            }),
+            client_gravatar: false,
+        };
+        const {result, msg, ...state} = await new Promise((success, error) => {
+            channel.post({url: "/json/register", data, success, error});
+        });
+        Object.assign(page_params, state);
+    }
     blueslip.measure_time("initialize_everything", () => {
         initialize_everything();
     });

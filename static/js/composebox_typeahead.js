@@ -2,7 +2,6 @@ import $ from "jquery";
 import _ from "lodash";
 
 import pygments_data from "../generated/pygments_data.json";
-import * as emoji from "../shared/js/emoji";
 import * as typeahead from "../shared/js/typeahead";
 
 import * as compose from "./compose";
@@ -10,6 +9,7 @@ import * as compose_pm_pill from "./compose_pm_pill";
 import * as compose_state from "./compose_state";
 import * as compose_ui from "./compose_ui";
 import * as compose_validate from "./compose_validate";
+import * as emoji from "./emoji";
 import * as flatpickr from "./flatpickr";
 import {$t} from "./i18n";
 import * as message_store from "./message_store";
@@ -47,8 +47,10 @@ export let emoji_collection = [];
 export function update_emoji_data() {
     emoji_collection = [];
     for (const emoji_dict of emoji.emojis_by_name.values()) {
+        const {reaction_type} = emoji.get_emoji_details_by_name(emoji_dict.name);
         if (emoji_dict.is_realm_emoji === true) {
             emoji_collection.push({
+                reaction_type,
                 emoji_name: emoji_dict.name,
                 emoji_url: emoji_dict.url,
                 is_realm_emoji: true,
@@ -56,6 +58,7 @@ export function update_emoji_data() {
         } else {
             for (const alias of emoji_dict.aliases) {
                 emoji_collection.push({
+                    reaction_type,
                     emoji_name: alias,
                     emoji_code: emoji_dict.emoji_code,
                 });
@@ -343,12 +346,16 @@ export function tokenize_compose_str(s) {
 }
 
 export function broadcast_mentions() {
-    return ["all", "everyone", "stream"].map((mention, idx) => ({
-        special_item_text: $t(
-            {defaultMessage: "{wildcard_mention_token} (Notify stream)"},
-            {wildcard_mention_token: mention},
-        ),
-
+    const wildcard_mention_array = ["all", "everyone"];
+    let wildcard_string = "";
+    if (compose_state.get_message_type() === "private") {
+        wildcard_string = $t({defaultMessage: "Notify recipients"});
+    } else {
+        wildcard_string = $t({defaultMessage: "Notify stream"});
+        wildcard_mention_array.push("stream");
+    }
+    return wildcard_mention_array.map((mention, idx) => ({
+        special_item_text: `${mention} (${wildcard_string})`,
         email: mention,
 
         // Always sort above, under the assumption that names will

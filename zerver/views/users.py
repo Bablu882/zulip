@@ -6,28 +6,32 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.utils.translation import gettext as _
 
-from zerver.context_processors import get_valid_realm_from_request
-from zerver.decorator import require_member_or_admin, require_realm_admin
-from zerver.forms import PASSWORD_TOO_WEAK_ERROR, CreateUserForm
-from zerver.lib.actions import (
-    check_change_bot_full_name,
-    check_change_full_name,
-    check_remove_custom_profile_field_value,
-    do_change_avatar_fields,
+from zerver.actions.bots import (
     do_change_bot_owner,
     do_change_default_all_public_streams,
     do_change_default_events_register_stream,
     do_change_default_sending_stream,
-    do_change_user_role,
-    do_create_user,
-    do_deactivate_user,
-    do_reactivate_user,
+)
+from zerver.actions.create_user import do_create_user, do_reactivate_user, notify_created_bot
+from zerver.actions.custom_profile_fields import (
+    check_remove_custom_profile_field_value,
+    do_update_user_custom_profile_data_if_changed,
+)
+from zerver.actions.user_settings import (
+    check_change_bot_full_name,
+    check_change_full_name,
+    do_change_avatar_fields,
     do_regenerate_api_key,
+)
+from zerver.actions.users import (
+    do_change_user_role,
+    do_deactivate_user,
     do_update_bot_config_data,
     do_update_outgoing_webhook_service,
-    do_update_user_custom_profile_data_if_changed,
-    notify_created_bot,
 )
+from zerver.context_processors import get_valid_realm_from_request
+from zerver.decorator import require_member_or_admin, require_realm_admin
+from zerver.forms import PASSWORD_TOO_WEAK_ERROR, CreateUserForm
 from zerver.lib.avatar import avatar_url, get_gravatar_url
 from zerver.lib.bot_config import set_bot_config
 from zerver.lib.email_validation import email_allowed_for_realm
@@ -36,10 +40,12 @@ from zerver.lib.exceptions import (
     JsonableError,
     MissingAuthenticationError,
     OrganizationOwnerRequired,
+    RateLimited,
 )
 from zerver.lib.integrations import EMBEDDED_BOTS
+from zerver.lib.rate_limiter import rate_limit_spectator_attachment_access_by_file
 from zerver.lib.request import REQ, has_request_variables
-from zerver.lib.response import json_success
+from zerver.lib.response import json_response_from_error, json_success
 from zerver.lib.streams import access_stream_by_id, access_stream_by_name, subscribed_to_stream
 from zerver.lib.types import ProfileDataElementValue, Validator
 from zerver.lib.upload import upload_avatar_image
@@ -187,10 +193,12 @@ def update_user_backend(
         # grant/remove the role in question.  access_user_by_id has
         # already verified we're an administrator; here we enforce
         # that only owners can toggle the is_realm_owner flag.
+        #
+        # Logic replicated in patch_bot_backend.
         if UserProfile.ROLE_REALM_OWNER in [role, target.role] and not user_profile.is_realm_owner:
             raise OrganizationOwnerRequired()
 
-        if target.role == UserProfile.ROLE_REALM_OWNER and check_last_owner(user_profile):
+        if target.role == UserProfile.ROLE_REALM_OWNER and check_last_owner(target):
             raise JsonableError(
                 _("The owner permission cannot be removed from the only organization owner.")
             )
@@ -247,6 +255,15 @@ def avatar(
         # interact with fake email addresses anyway.
         if is_email:
             raise MissingAuthenticationError()
+
+        if settings.RATE_LIMITING:
+            try:
+                unique_avatar_key = f"{realm.id}/{email_or_id}/{medium}"
+                rate_limit_spectator_attachment_access_by_file(unique_avatar_key)
+            except RateLimited:
+                return json_response_from_error(
+                    RateLimited(_("Too many attempts, please try after some time."))
+                )
     else:
         realm = maybe_user_profile.realm
 
@@ -287,6 +304,12 @@ def patch_bot_backend(
     user_profile: UserProfile,
     bot_id: int,
     full_name: Optional[str] = REQ(default=None),
+    role: Optional[int] = REQ(
+        default=None,
+        json_validator=check_int_in(
+            UserProfile.ROLE_TYPES,
+        ),
+    ),
     bot_owner_id: Optional[int] = REQ(json_validator=check_int, default=None),
     config_data: Optional[Dict[str, str]] = REQ(
         default=None, json_validator=check_dict(value_validator=check_string)
@@ -301,6 +324,14 @@ def patch_bot_backend(
 
     if full_name is not None:
         check_change_bot_full_name(bot, full_name, user_profile)
+
+    if role is not None and bot.role != role:
+        # Logic duplicated from update_user_backend.
+        if UserProfile.ROLE_REALM_OWNER in [role, bot.role] and not user_profile.is_realm_owner:
+            raise OrganizationOwnerRequired()
+
+        do_change_user_role(bot, role, acting_user=user_profile)
+
     if bot_owner_id is not None:
         try:
             owner = get_user_profile_by_id_in_realm(bot_owner_id, user_profile.realm)

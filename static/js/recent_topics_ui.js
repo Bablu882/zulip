@@ -18,6 +18,7 @@ import * as muted_topics from "./muted_topics";
 import * as narrow from "./narrow";
 import * as narrow_state from "./narrow_state";
 import * as navigate from "./navigate";
+import {page_params} from "./page_params";
 import * as people from "./people";
 import * as recent_senders from "./recent_senders";
 import {get, process_message, topics} from "./recent_topics_data";
@@ -86,7 +87,12 @@ export function save_filters() {
 }
 
 export function load_filters() {
-    filters = new Set(ls.get(ls_key));
+    if (!page_params.is_spectator) {
+        // A user may have a stored filter and can log out
+        // to see web public view. This ensures no filters are
+        // selected for spectators.
+        filters = new Set(ls.get(ls_key));
+    }
 }
 
 export function set_default_focus() {
@@ -479,6 +485,7 @@ export function update_filters_view() {
         filter_participated: filters.has("participated"),
         filter_unread: filters.has("unread"),
         filter_muted: filters.has("include_muted"),
+        is_spectator: page_params.is_spectator,
     });
     $("#recent_filters_group").html(rendered_filters);
     show_selected_filters();
@@ -590,6 +597,7 @@ export function complete_rerender() {
         filter_unread: filters.has("unread"),
         filter_muted: filters.has("include_muted"),
         search_val: $("#recent_topics_search").val() || "",
+        is_spectator: page_params.is_spectator,
     });
     $("#recent_topics_table").html(rendered_body);
     const $container = $("#recent_topics_table table tbody");
@@ -652,6 +660,7 @@ export function show() {
     narrow_state.reset_current_filter();
     narrow.set_narrow_title("Recent topics");
     message_view_header.render_title_area();
+    narrow.handle_middle_pane_transition();
 
     complete_rerender();
 }

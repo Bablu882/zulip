@@ -3,7 +3,8 @@ import os
 import re
 import uuid
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple
 from unittest import mock, skipUnless
 
 import orjson
@@ -13,12 +14,19 @@ from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
 from django.utils.timezone import now as timezone_now
 
+from zerver.actions.create_realm import do_create_realm
+from zerver.actions.create_user import do_reactivate_user
+from zerver.actions.realm_settings import (
+    do_deactivate_realm,
+    do_reactivate_realm,
+    do_set_realm_property,
+)
+from zerver.actions.users import change_user_is_active, do_deactivate_user
 from zerver.decorator import (
     authenticate_notify,
     authenticated_json_view,
     authenticated_rest_api_view,
     authenticated_uploads_api_view,
-    cachify,
     internal_notify_view,
     is_local_addr,
     rate_limit,
@@ -28,15 +36,6 @@ from zerver.decorator import (
     zulip_login_required,
 )
 from zerver.forms import OurAuthenticationForm
-from zerver.lib.actions import (
-    change_user_is_active,
-    do_create_realm,
-    do_deactivate_realm,
-    do_deactivate_user,
-    do_reactivate_realm,
-    do_reactivate_user,
-    do_set_realm_property,
-)
 from zerver.lib.cache import dict_to_items_tuple, ignore_unhashable_lru_cache, items_tuple_to_dict
 from zerver.lib.exceptions import (
     AccessDeniedError,
@@ -85,11 +84,14 @@ from zerver.lib.validator import (
     to_non_negative_int,
     to_wild_value,
 )
-from zerver.middleware import parse_client
+from zerver.middleware import LogRequests, parse_client
 from zerver.models import Realm, UserProfile, get_realm, get_user
 
 if settings.ZILENCER_ENABLED:
     from zilencer.models import RemoteZulipServer
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
 
 
 class DecoratorTestCase(ZulipTestCase):
@@ -97,37 +99,66 @@ class DecoratorTestCase(ZulipTestCase):
         req = HostRequestMock()
         self.assertEqual(parse_client(req), ("Unspecified", None))
 
+        req = HostRequestMock()
         req.META[
             "HTTP_USER_AGENT"
         ] = "ZulipElectron/4.0.3 Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/537.36 (KHTML, like Gecko) Zulip/4.0.3 Chrome/66.0.3359.181 Electron/3.1.10 Safari/537.36"
         self.assertEqual(parse_client(req), ("ZulipElectron", "4.0.3"))
 
+        req = HostRequestMock()
         req.META["HTTP_USER_AGENT"] = "ZulipDesktop/0.4.4 (Mac)"
         self.assertEqual(parse_client(req), ("ZulipDesktop", "0.4.4"))
 
+        req = HostRequestMock()
         req.META["HTTP_USER_AGENT"] = "ZulipMobile/26.22.145 (Android 10)"
         self.assertEqual(parse_client(req), ("ZulipMobile", "26.22.145"))
 
+        req = HostRequestMock()
         req.META["HTTP_USER_AGENT"] = "ZulipMobile/26.22.145 (iOS 13.3.1)"
         self.assertEqual(parse_client(req), ("ZulipMobile", "26.22.145"))
 
         # TODO: This should ideally be Firefox.
+        req = HostRequestMock()
         req.META[
             "HTTP_USER_AGENT"
         ] = "Mozilla/5.0 (X11; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0"
         self.assertEqual(parse_client(req), ("Mozilla", None))
 
         # TODO: This should ideally be Chrome.
+        req = HostRequestMock()
         req.META[
             "HTTP_USER_AGENT"
         ] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.43 Safari/537.36"
         self.assertEqual(parse_client(req), ("Mozilla", None))
 
         # TODO: This should ideally be Mobile Safari if we had better user-agent parsing.
+        req = HostRequestMock()
         req.META[
             "HTTP_USER_AGENT"
         ] = "Mozilla/5.0 (Linux; Android 8.0.0; SM-G930F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Mobile Safari/537.36"
         self.assertEqual(parse_client(req), ("Mozilla", None))
+
+        post_req_with_client = HostRequestMock()
+        post_req_with_client.POST["client"] = "test_client_1"
+        post_req_with_client.META["HTTP_USER_AGENT"] = "ZulipMobile/26.22.145 (iOS 13.3.1)"
+        self.assertEqual(parse_client(post_req_with_client), ("test_client_1", None))
+
+        get_req_with_client = HostRequestMock()
+        get_req_with_client.GET["client"] = "test_client_2"
+        get_req_with_client.META["HTTP_USER_AGENT"] = "ZulipMobile/26.22.145 (iOS 13.3.1)"
+        self.assertEqual(parse_client(get_req_with_client), ("test_client_2", None))
+
+    def test_unparsable_user_agent(self) -> None:
+        request = HttpRequest()
+        request.POST["param"] = "test"
+        request.META["HTTP_USER_AGENT"] = "mocked should fail"
+        with mock.patch(
+            "zerver.middleware.parse_client", side_effect=JsonableError("message")
+        ) as m, self.assertLogs(level="ERROR"):
+            LogRequests.process_request(self, request)
+        request_notes = RequestNotes.get_notes(request)
+        self.assertEqual(request_notes.client_name, "Unparsable")
+        m.assert_called_once()
 
     def test_REQ_aliases(self) -> None:
         @has_request_variables
@@ -297,8 +328,8 @@ class DecoratorTestCase(ZulipTestCase):
             my_webhook(request)
 
         # Start a valid request here
+        request = HostRequestMock()
         request.POST["api_key"] = webhook_bot_api_key
-
         with self.assertLogs(level="WARNING") as m:
             with self.assertRaisesRegex(
                 JsonableError, "Account is not associated with this subdomain"
@@ -313,6 +344,8 @@ class DecoratorTestCase(ZulipTestCase):
             ],
         )
 
+        request = HostRequestMock()
+        request.POST["api_key"] = webhook_bot_api_key
         with self.assertLogs(level="WARNING") as m:
             with self.assertRaisesRegex(
                 JsonableError, "Account is not associated with this subdomain"
@@ -328,11 +361,13 @@ class DecoratorTestCase(ZulipTestCase):
             ],
         )
 
-        request.host = "zulip.testserver"
         # Test when content_type is application/json and request.body
         # is valid JSON; exception raised in the webhook function
         # should be re-raised
 
+        request = HostRequestMock()
+        request.host = "zulip.testserver"
+        request.POST["api_key"] = webhook_bot_api_key
         with self.assertLogs("zulip.zerver.webhooks", level="INFO") as log:
             with self.assertRaisesRegex(Exception, "raised by webhook function"):
                 request.body = b"{}"
@@ -342,6 +377,9 @@ class DecoratorTestCase(ZulipTestCase):
         # Test when content_type is not application/json; exception raised
         # in the webhook function should be re-raised
 
+        request = HostRequestMock()
+        request.host = "zulip.testserver"
+        request.POST["api_key"] = webhook_bot_api_key
         with self.assertLogs("zulip.zerver.webhooks", level="INFO") as log:
             with self.assertRaisesRegex(Exception, "raised by webhook function"):
                 request.body = b"notjson"
@@ -351,6 +389,9 @@ class DecoratorTestCase(ZulipTestCase):
         # Test when content_type is application/json but request.body
         # is not valid JSON; invalid JSON should be logged and the
         # exception raised in the webhook function should be re-raised
+        request = HostRequestMock()
+        request.host = "zulip.testserver"
+        request.POST["api_key"] = webhook_bot_api_key
         with self.assertLogs("zulip.zerver.webhooks", level="ERROR") as log:
             with self.assertRaisesRegex(Exception, "raised by webhook function"):
                 request.body = b"invalidjson"
@@ -363,6 +404,9 @@ class DecoratorTestCase(ZulipTestCase):
         )
 
         # Test when an unsupported webhook event occurs
+        request = HostRequestMock()
+        request.host = "zulip.testserver"
+        request.POST["api_key"] = webhook_bot_api_key
         exception_msg = "The 'test_event' event isn't currently supported by the ClientName webhook"
         with self.assertLogs("zulip.zerver.webhooks.unsupported", level="ERROR") as log:
             with self.assertRaisesRegex(UnsupportedWebhookEventType, exception_msg):
@@ -375,6 +419,9 @@ class DecoratorTestCase(ZulipTestCase):
             self.logger_output(exception_msg, "error", "webhooks.unsupported"), log.output[0]
         )
 
+        request = HostRequestMock()
+        request.host = "zulip.testserver"
+        request.POST["api_key"] = webhook_bot_api_key
         with self.settings(RATE_LIMITING=True):
             with mock.patch("zerver.decorator.rate_limit_user") as rate_limit_mock:
                 api_result = orjson.loads(my_webhook(request).content).get("msg")
@@ -389,6 +436,9 @@ class DecoratorTestCase(ZulipTestCase):
 
         # Now deactivate the user
         change_user_is_active(webhook_bot, False)
+        request = HostRequestMock()
+        request.host = "zulip.testserver"
+        request.POST["api_key"] = webhook_bot_api_key
         with self.assertRaisesRegex(JsonableError, "Account is deactivated"):
             my_webhook(request)
 
@@ -396,6 +446,9 @@ class DecoratorTestCase(ZulipTestCase):
         change_user_is_active(webhook_bot, True)
         webhook_bot.realm.deactivated = True
         webhook_bot.realm.save()
+        request = HostRequestMock()
+        request.host = "zulip.testserver"
+        request.POST["api_key"] = webhook_bot_api_key
         with self.assertRaisesRegex(JsonableError, "This organization has been deactivated"):
             my_webhook(request)
 
@@ -418,6 +471,10 @@ class SkipRateLimitingTest(ZulipTestCase):
 
         self.assert_json_success(result)
         self.assertFalse(rate_limit_mock.called)
+
+        request = HostRequestMock(host="zulip.testserver")
+        request.META["HTTP_AUTHORIZATION"] = self.encode_email(self.example_email("hamlet"))
+        request.method = "POST"
         with mock.patch("zerver.decorator.rate_limit") as rate_limit_mock:
             result = my_rate_limited_view(request)
 
@@ -441,6 +498,10 @@ class SkipRateLimitingTest(ZulipTestCase):
 
         self.assert_json_success(result)
         self.assertFalse(rate_limit_mock.called)
+
+        request = HostRequestMock(host="zulip.testserver")
+        request.method = "POST"
+        request.POST["api_key"] = get_api_key(self.example_user("hamlet"))
         with mock.patch("zerver.decorator.rate_limit") as rate_limit_mock:
             result = my_rate_limited_view(request)
 
@@ -462,6 +523,10 @@ class SkipRateLimitingTest(ZulipTestCase):
 
         self.assert_json_success(result)
         self.assertFalse(rate_limit_mock.called)
+
+        request = HostRequestMock(host="zulip.testserver")
+        request.method = "POST"
+        request.user = self.example_user("hamlet")
         with mock.patch("zerver.decorator.rate_limit") as rate_limit_mock:
             result = my_rate_limited_view(request)
 
@@ -1499,6 +1564,11 @@ class TestInternalNotifyView(ZulipTestCase):
             with self.assertRaises(RuntimeError):
                 self.internal_notify(True, request)
 
+        request = HostRequestMock(
+            post_data=dict(secret=secret),
+            meta_data=dict(REMOTE_ADDR="127.0.0.1"),
+            tornado_handler=None,
+        )
         RequestNotes.get_notes(request).tornado_handler = DummyHandler()
         with self.settings(SHARED_SECRET=secret):
             self.assertTrue(authenticate_notify(request))
@@ -1705,7 +1775,7 @@ class TestAuthenticatedJsonPostViewDecorator(ZulipTestCase):
         )
         do_reactivate_realm(user_profile.realm)
 
-    def _do_test(self, user: UserProfile) -> HttpResponse:
+    def _do_test(self, user: UserProfile) -> "TestHttpResponse":
         stream_name = "stream name"
         self.common_subscribe_to_streams(user, [stream_name], allow_fail=True)
         data = {"password": initial_password(user.email), "stream": stream_name}
@@ -1748,7 +1818,7 @@ class TestAuthenticatedJsonViewDecorator(ZulipTestCase):
             ],
         )
 
-    def _do_test(self, user_email: str) -> HttpResponse:
+    def _do_test(self, user_email: str) -> "TestHttpResponse":
         data = {"password": initial_password(user_email)}
         return self.client_post(r"/accounts/webathena_kerberos_login/", data)
 
@@ -1916,17 +1986,17 @@ class RestAPITest(ZulipTestCase):
 
         result = self.client_options("/json/streams/15")
         self.assertEqual(result.status_code, 204)
-        self.assertEqual(str(result["Allow"]), "DELETE, PATCH")
+        self.assertEqual(str(result["Allow"]), "DELETE, GET, HEAD, PATCH")
 
     def test_http_accept_redirect(self) -> None:
         result = self.client_get("/json/users", HTTP_ACCEPT="text/html")
         self.assertEqual(result.status_code, 302)
-        self.assertTrue(result["Location"].endswith("/login/?next=/json/users"))
+        self.assertTrue(result["Location"].endswith("/login/?next=%2Fjson%2Fusers"))
 
 
 class CacheTestCase(ZulipTestCase):
     def test_cachify_basics(self) -> None:
-        @cachify
+        @lru_cache(maxsize=None)
         def add(w: Any, x: Any, y: Any, z: Any) -> Any:
             return w + x + y + z
 
@@ -1940,7 +2010,7 @@ class CacheTestCase(ZulipTestCase):
             result_log: List[str] = []
             work_log: List[str] = []
 
-            @cachify
+            @lru_cache(maxsize=None)
             def greet(first_name: str, last_name: str) -> str:
                 msg = f"{greeting} {first_name} {last_name}"
                 work_log.append(msg)
@@ -2149,7 +2219,7 @@ class TestRequestNotes(ZulipTestCase):
         # no realm can be set on the request notes.
         with mock.patch("zerver.views.home.zulip_login_required", lambda f: mock_home(None)):
             result = self.client_get("/", subdomain="")
-            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result.status_code, 404)
 
         root_subdomain_realm = do_create_realm("", "Root Domain")
         # Now test that that realm does get set, if it exists, for requests

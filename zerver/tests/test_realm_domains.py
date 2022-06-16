@@ -2,13 +2,10 @@ import orjson
 from django.core.exceptions import ValidationError
 from django.db.utils import IntegrityError
 
-from zerver.lib.actions import (
-    do_change_realm_domain,
-    do_change_user_role,
-    do_create_realm,
-    do_remove_realm_domain,
-    do_set_realm_property,
-)
+from zerver.actions.create_realm import do_create_realm
+from zerver.actions.realm_domains import do_change_realm_domain, do_remove_realm_domain
+from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.users import do_change_user_role
 from zerver.lib.domains import validate_domain
 from zerver.lib.email_validation import email_allowed_for_realm
 from zerver.lib.test_classes import ZulipTestCase
@@ -25,8 +22,7 @@ class RealmDomainTest(ZulipTestCase):
         realm = get_realm("zulip")
         RealmDomain.objects.create(realm=realm, domain="acme.com", allow_subdomains=True)
         result = self.client_get("/json/realm/domains")
-        self.assert_json_success(result)
-        received = result.json()["domains"]
+        received = self.assert_json_success(result)["domains"]
         expected = [
             {"domain": "zulip.com", "allow_subdomains": False},
             {"domain": "acme.com", "allow_subdomains": True},

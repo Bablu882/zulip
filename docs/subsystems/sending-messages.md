@@ -71,12 +71,12 @@ This section details the ways in which it is different:
     `apply_markdown` and `client_gravatar` features in our
     [events API docs](https://zulip.com/api/register-queue)).
 - Following our standard naming convention, input validation is done
-  inside the `check_message` function in `zerver/lib/actions.py`, which is responsible for
+  inside the `check_message` function in `zerver/actions/message_send.py`, which is responsible for
   validating the user can send to the recipient,
   [rendering the Markdown](markdown.md), etc. --
   basically everything that can fail due to bad user input.
 - The core `do_send_messages` function (which handles actually sending
-  the message) in `zerver/lib/actions.py` is one of the most optimized and thus complex parts of
+  the message) in `zerver/actions/message_send.py` is one of the most optimized and thus complex parts of
   the system. But in short, its job is to atomically do a few key
   things:
   - Store a `Message` row in the database.
@@ -387,3 +387,9 @@ There are a few details that require special care with this system:
   determine what has happened in streams the user can see. We can use
   the user's subscriptions to construct what messages they should have
   access to for this feature.
+- Soft-deactivated users experience high loading latency when
+  returning after being idle for months. We optimize this by
+  triggering a soft reactivation for users who receive email or push
+  notification for private messages or personal mentions, or who
+  request a password reset, since these are good leading indicators
+  that a user is likely to return to Zulip.

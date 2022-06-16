@@ -53,11 +53,19 @@ organization's policy choices.
 * [Deactivate bots](/help/deactivate-or-reactivate-a-bot) or
   [delete custom emoji](/help/custom-emoji#delete-custom-emoji).
 
-## Web-public streams
+## Public access option
 
 {!web-public-streams-intro.md!}
+
+## Zulip communities directory
+
+{!communities-directory-intro.md!}
+
+For details on how to get your community listed, see [Communities
+directory](/help/communities-directory).
 
 ## Related articles
 
 * [Setting up your organization](/help/getting-your-organization-started-with-zulip)
-* [Web-public streams](/help/web-public-streams)
+* [Public access option](/help/public-access-option)
+* [Communities directory](/help/communities-directory)

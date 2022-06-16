@@ -10,26 +10,23 @@ from django.db.models import Q
 from django.utils.timezone import now as timezone_now
 
 from analytics.models import UserCount
-from zerver.lib import upload
-from zerver.lib.actions import (
-    check_add_reaction,
-    check_add_realm_emoji,
-    do_add_alert_words,
-    do_add_reaction,
-    do_change_icon_source,
-    do_change_logo_source,
-    do_change_realm_plan_type,
-    do_create_user,
-    do_deactivate_user,
-    do_mute_topic,
-    do_mute_user,
-    do_update_user_activity,
-    do_update_user_activity_interval,
+from zerver.actions.alert_words import do_add_alert_words
+from zerver.actions.create_user import do_create_user
+from zerver.actions.custom_profile_fields import (
     do_update_user_custom_profile_data_if_changed,
-    do_update_user_presence,
-    do_update_user_status,
     try_add_realm_custom_profile_field,
 )
+from zerver.actions.muted_users import do_mute_user
+from zerver.actions.presence import do_update_user_presence, do_update_user_status
+from zerver.actions.reactions import check_add_reaction, do_add_reaction
+from zerver.actions.realm_emoji import check_add_realm_emoji
+from zerver.actions.realm_icon import do_change_icon_source
+from zerver.actions.realm_logo import do_change_logo_source
+from zerver.actions.realm_settings import do_change_realm_plan_type
+from zerver.actions.user_activity import do_update_user_activity, do_update_user_activity_interval
+from zerver.actions.user_topics import do_mute_topic
+from zerver.actions.users import do_deactivate_user
+from zerver.lib import upload
 from zerver.lib.avatar_hash import user_avatar_path
 from zerver.lib.bot_config import set_bot_config
 from zerver.lib.bot_lib import StateHandler
@@ -226,6 +223,7 @@ class ExportFile(ZulipTestCase):
 
         realm_emoji = RealmEmoji.objects.get(author=user)
         file_name = realm_emoji.file_name
+        assert file_name is not None
         assert file_name.endswith(".png")
 
         emoji_path = f"{realm.id}/emoji/images/{file_name}"
@@ -513,6 +511,7 @@ class RealmImportExportTest(ExportFile):
             content="Thumbs up for export",
         )
         message = Message.objects.last()
+        assert message is not None
         consented_user_ids = [self.example_user(user).id for user in ["iago", "hamlet"]]
         do_add_reaction(
             self.example_user("iago"), message, "outbox", "1f4e4", Reaction.UNICODE_EMOJI
@@ -908,7 +907,9 @@ class RealmImportExportTest(ExportFile):
 
         # test recipients
         def get_recipient_stream(r: Realm) -> Recipient:
-            return Stream.objects.get(name="Verona", realm=r).recipient
+            recipient = Stream.objects.get(name="Verona", realm=r).recipient
+            assert recipient is not None
+            return recipient
 
         def get_recipient_user(r: Realm) -> Recipient:
             return UserProfile.objects.get(full_name="Iago", realm=r).recipient
@@ -1178,6 +1179,7 @@ class RealmImportExportTest(ExportFile):
         uploaded_file = Attachment.objects.get(realm=imported_realm)
         self.assert_length(b"zulip!", uploaded_file.size)
 
+        assert settings.LOCAL_UPLOADS_DIR is not None
         attachment_file_path = os.path.join(
             settings.LOCAL_UPLOADS_DIR, "files", uploaded_file.path_id
         )
@@ -1517,10 +1519,10 @@ class SingleUserExportTest(ExportFile):
             reaction_type=None,
         )
         reaction = Reaction.objects.order_by("id").last()
-        assert reaction
 
         @checker
         def zerver_reaction(records: List[Record]) -> None:
+            assert reaction
             (exported_reaction,) = records
             self.assertEqual(
                 exported_reaction,

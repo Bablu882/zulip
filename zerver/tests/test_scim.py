@@ -1,15 +1,17 @@
 import copy
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, Mapping
+from typing import TYPE_CHECKING, Any, Dict, Iterator, Mapping
 from unittest import mock
 
 import orjson
 from django.conf import settings
-from django.http import HttpResponse
 
-from zerver.lib.actions import do_change_full_name
+from zerver.actions.user_settings import do_change_full_name
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.models import SCIMClient, UserProfile, get_realm
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
 
 
 class SCIMTestCase(ZulipTestCase):
@@ -39,7 +41,7 @@ class SCIMTestCase(ZulipTestCase):
             },
         }
 
-    def assert_uniqueness_error(self, result: HttpResponse, extra_message: str) -> None:
+    def assert_uniqueness_error(self, result: "TestHttpResponse", extra_message: str) -> None:
         self.assertEqual(result.status_code, 409)
         output_data = orjson.loads(result.content)
 
@@ -98,7 +100,7 @@ class TestExceptionDetailsNotRevealedToClient(SCIMTestCase):
             result = self.client_get("/scim/v2/Users", {}, **self.scim_headers())
             # Only a generic error message is returned:
             self.assertEqual(
-                result.json(),
+                orjson.loads(result.content),
                 {
                     "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                     "detail": "Exception occurred while processing the SCIM request",
@@ -287,6 +289,7 @@ class TestSCIMUser(SCIMTestCase):
         self.assertEqual(new_user_count, original_user_count + 1)
 
         new_user = UserProfile.objects.last()
+        assert new_user is not None
         self.assertEqual(new_user.delivery_email, "newuser@zulip.com")
         self.assertEqual(new_user.full_name, "New User")
 
@@ -315,6 +318,7 @@ class TestSCIMUser(SCIMTestCase):
         self.assertEqual(new_user_count, original_user_count + 1)
 
         new_user = UserProfile.objects.last()
+        assert new_user is not None
         self.assertEqual(new_user.delivery_email, "newuser@zulip.com")
         self.assertEqual(new_user.full_name, "New User")
 
@@ -349,9 +353,8 @@ class TestSCIMUser(SCIMTestCase):
         result = self.client_post(
             "/scim/v2/Users", payload, content_type="application/json", **self.scim_headers()
         )
-        response_dict = result.json()
         self.assertEqual(
-            response_dict,
+            orjson.loads(result.content),
             {
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "detail": "Must specify name.formatted, name.givenName or name.familyName when creating a new user",
@@ -371,9 +374,8 @@ class TestSCIMUser(SCIMTestCase):
         result = self.client_post(
             "/scim/v2/Users", payload, content_type="application/json", **self.scim_headers()
         )
-        response_dict = result.json()
         self.assertEqual(
-            response_dict,
+            orjson.loads(result.content),
             {
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "detail": "New user must have active=True",
@@ -397,9 +399,8 @@ class TestSCIMUser(SCIMTestCase):
         result = self.client_post(
             "/scim/v2/Users", payload, content_type="application/json", **self.scim_headers()
         )
-        response_dict = result.json()
         self.assertEqual(
-            response_dict,
+            orjson.loads(result.content),
             {
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "detail": "This email domain isn't allowed in this organization.",
@@ -636,7 +637,7 @@ class TestSCIMUser(SCIMTestCase):
         with self.assertLogs("django.request", "ERROR") as m:
             result = self.json_patch(f"/scim/v2/Users/{hamlet.id}", payload, **self.scim_headers())
             self.assertEqual(
-                result.json(),
+                orjson.loads(result.content),
                 {
                     "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                     "detail": "Not Implemented",

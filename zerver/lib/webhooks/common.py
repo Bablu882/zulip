@@ -7,7 +7,7 @@ from urllib.parse import unquote
 from django.http import HttpRequest
 from django.utils.translation import gettext as _
 
-from zerver.lib.actions import (
+from zerver.actions.message_send import (
     check_send_private_message,
     check_send_stream_message,
     check_send_stream_message_by_id,
@@ -37,9 +37,6 @@ that this integration expects!
 
 SETUP_MESSAGE_TEMPLATE = "{integration} webhook has been successfully configured"
 SETUP_MESSAGE_USER_PART = " by {user_name}"
-
-# Django prefixes all custom HTTP headers with `HTTP_`
-DJANGO_HTTP_PREFIX = "HTTP_"
 
 
 def get_setup_webhook_message(integration: str, user_name: Optional[str] = None) -> str:
@@ -166,7 +163,7 @@ def validate_extract_webhook_http_header(
 ) -> Optional[str]:
     assert request.user.is_authenticated
 
-    extracted_header = request.META.get(DJANGO_HTTP_PREFIX + header)
+    extracted_header = request.headers.get(header)
     if extracted_header is None and fatal:
         message_body = MISSING_EVENT_HEADER_MESSAGE.format(
             bot_name=request.user.full_name,

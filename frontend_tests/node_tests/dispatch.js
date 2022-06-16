@@ -88,6 +88,7 @@ page_params.realm_description = "already set description";
 
 // For data-oriented modules, just use them, don't stub them.
 const alert_words = zrequire("alert_words");
+const emoji = zrequire("emoji");
 const stream_topic_history = zrequire("stream_topic_history");
 const stream_list = zrequire("stream_list");
 const message_helper = zrequire("message_helper");
@@ -96,8 +97,6 @@ const people = zrequire("people");
 const starred_messages = zrequire("starred_messages");
 const user_status = zrequire("user_status");
 const compose_pm_pill = zrequire("compose_pm_pill");
-
-const emoji = zrequire("../shared/js/emoji");
 
 const server_events_dispatch = zrequire("server_events_dispatch");
 
@@ -180,6 +179,17 @@ run_test("user groups", ({override}) => {
         assert_same(args.user_ids, event.user_ids);
     }
 
+    event = event_fixtures.user_group__add_subgroups;
+    {
+        const stub = make_stub();
+        override(user_groups, "add_subgroups", stub.f);
+        dispatch(event);
+        assert.equal(stub.num_calls, 1);
+        const args = stub.get_args("group_id", "direct_subgroup_ids");
+        assert_same(args.group_id, event.group_id);
+        assert_same(args.direct_subgroup_ids, event.direct_subgroup_ids);
+    }
+
     event = event_fixtures.user_group__remove_members;
     {
         const stub = make_stub();
@@ -189,6 +199,17 @@ run_test("user groups", ({override}) => {
         const args = stub.get_args("group_id", "user_ids");
         assert_same(args.group_id, event.group_id);
         assert_same(args.user_ids, event.user_ids);
+    }
+
+    event = event_fixtures.user_group__remove_subgroups;
+    {
+        const stub = make_stub();
+        override(user_groups, "remove_subgroups", stub.f);
+        dispatch(event);
+        assert.equal(stub.num_calls, 1);
+        const args = stub.get_args("group_id", "direct_subgroup_ids");
+        assert_same(args.group_id, event.group_id);
+        assert_same(args.direct_subgroup_ids, event.direct_subgroup_ids);
     }
 
     event = event_fixtures.user_group__update;
@@ -386,6 +407,9 @@ run_test("realm settings", ({override}) => {
     event = event_fixtures.realm__update__invite_to_realm_policy;
     test_realm_integer(event, "realm_invite_to_realm_policy");
 
+    event = event_fixtures.realm__update__want_advertise_in_communities_directory;
+    test_realm_boolean(event, "realm_want_advertise_in_communities_directory");
+
     event = event_fixtures.realm__update__name;
 
     test_electron_dispatch(event, (key, val) => {
@@ -393,6 +417,10 @@ run_test("realm settings", ({override}) => {
         assert_same(val, "new_realm_name");
     });
     assert_same(page_params.realm_name, "new_realm_name");
+
+    event = event_fixtures.realm__update__org_type;
+    dispatch(event);
+    assert_same(page_params.realm_org_type, 50);
 
     event = event_fixtures.realm__update__emails_restricted_to_domains;
     test_realm_boolean(event, "realm_emails_restricted_to_domains");
@@ -743,6 +771,11 @@ run_test("user_settings", ({override, override_rewire}) => {
     user_settings.translate_emoticons = false;
     dispatch(event);
     assert_same(user_settings.translate_emoticons, true);
+
+    event = event_fixtures.user_settings__display_emoji_reaction_users;
+    user_settings.display_emoji_reaction_users = false;
+    dispatch(event);
+    assert_same(user_settings.display_emoji_reaction_users, true);
 
     event = event_fixtures.user_settings__high_contrast_mode;
     user_settings.high_contrast_mode = false;

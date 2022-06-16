@@ -17,12 +17,12 @@ set_global("document", {
     querySelector: () => {},
 });
 set_global("navigator", {});
-// eslint-disable-next-line prefer-arrow-callback
-set_global("ResizeObserver", function () {
-    return {
-        observe: () => {},
-    };
-});
+set_global(
+    "ResizeObserver",
+    class ResizeObserver {
+        observe() {}
+    },
+);
 
 const fake_now = 555;
 
@@ -144,10 +144,6 @@ test_ui("send_message", ({override, override_rewire}) => {
         stub_state.reify_message_id_checked = 0;
         return stub_state;
     }
-
-    set_global("setTimeout", (func) => {
-        func();
-    });
 
     override(server_events, "assert_get_events_running", () => {
         stub_state.get_events_running_called += 1;
@@ -429,10 +425,15 @@ test_ui("initialize", ({override, override_rewire}) => {
     });
 
     let xmlhttprequest_checked = false;
-    set_global("XMLHttpRequest", function () {
-        this.upload = true;
-        xmlhttprequest_checked = true;
-    });
+    set_global(
+        "XMLHttpRequest",
+        class XMLHTTPRequest {
+            upload = true;
+            constructor() {
+                xmlhttprequest_checked = true;
+            }
+        },
+    );
     $("#compose .compose_upload_file").addClass("notdisplayed");
 
     page_params.max_file_upload_size_mib = 512;
@@ -503,6 +504,7 @@ test_ui("update_fade", ({override, override_rewire}) => {
 
     let set_focused_recipient_checked = false;
     let update_all_called = false;
+    let update_narrow_to_recipient_visibility_called = false;
 
     override_rewire(compose_fade, "set_focused_recipient", (msg_type) => {
         assert.equal(msg_type, "private");
@@ -513,15 +515,23 @@ test_ui("update_fade", ({override, override_rewire}) => {
         update_all_called = true;
     });
 
+    override(compose_actions, "update_narrow_to_recipient_visibility", () => {
+        update_narrow_to_recipient_visibility_called = true;
+    });
+
     compose_state.set_message_type(false);
     keyup_handler_func();
     assert.ok(!set_focused_recipient_checked);
     assert.ok(!update_all_called);
+    assert.ok(update_narrow_to_recipient_visibility_called);
+
+    update_narrow_to_recipient_visibility_called = false;
 
     compose_state.set_message_type("private");
     keyup_handler_func();
     assert.ok(set_focused_recipient_checked);
     assert.ok(update_all_called);
+    assert.ok(update_narrow_to_recipient_visibility_called);
 });
 
 test_ui("trigger_submit_compose_form", ({override, override_rewire}) => {
@@ -635,13 +645,15 @@ test_ui("on_events", ({override, override_rewire}) => {
         );
 
         helper.$container.data = (field) => {
-            if (field === "user-id") {
-                return "34";
+            switch (field) {
+                case "user-id":
+                    return "34";
+                case "stream-id":
+                    return "102";
+                /* istanbul ignore next */
+                default:
+                    throw new Error(`Unknown field ${field}`);
             }
-            if (field === "stream-id") {
-                return "102";
-            }
-            throw new Error(`Unknown field ${field}`);
         };
         helper.$target.prop("disabled", false);
 
@@ -737,9 +749,6 @@ test_ui("on_events", ({override, override_rewire}) => {
 
     (function test_attach_files_compose_clicked() {
         const handler = $("#compose").get_on_handler("click", ".compose_upload_file");
-        $("#compose .file_input").clone = (param) => {
-            assert.ok(param);
-        };
         let compose_file_input_clicked = false;
         $("#compose .file_input").on("click", () => {
             compose_file_input_clicked = true;

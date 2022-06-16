@@ -242,7 +242,11 @@ setup.
 If you need to modify Zulip's `nginx` configuration, we recommend
 first attempting to add configuration to `/etc/nginx/conf.d` or
 `/etc/nginx/zulip-include/app.d`; those directories are designed for
-custom configuration.
+custom configuration, and are not overridden during upgrades. The
+former is useful for directives with the `http` [context][context],
+and the latter for `server` contexts.
+
+[context]: http://nginx.org/en/docs/beginners_guide.html#conf_structure
 
 ## Upgrading the operating system
 
@@ -292,16 +296,7 @@ instructions for other supported platforms.
    /home/zulip/deployments/current/scripts/setup/upgrade-postgresql
    ```
 
-5. Ubuntu 20.04 has a different version of the low-level glibc
-   library, which affects how PostgreSQL orders text data (known as
-   "collations"); this corrupts database indexes that rely on
-   collations. Regenerate the affected indexes by running:
-
-   ```bash
-   /home/zulip/deployments/current/scripts/setup/reindex-textual-data --force
-   ```
-
-6. Finally, we need to reinstall the current version of Zulip, which
+5. Next, we need to reinstall the current version of Zulip, which
    among other things will recompile Zulip's Python module
    dependencies for your new version of Python and rewrite Zulip's
    full-text search indexes to work with the upgraded dictionary
@@ -316,6 +311,15 @@ instructions for other supported platforms.
    This will finish by restarting your Zulip server; you should now be
    able to navigate to its URL and confirm everything is working
    correctly.
+
+6. Finally, Ubuntu 20.04 has a different version of the low-level
+   glibc library, which affects how PostgreSQL orders text data (known
+   as "collations"); this corrupts database indexes that rely on
+   collations. Regenerate the affected indexes by running:
+
+   ```bash
+   /home/zulip/deployments/current/scripts/setup/reindex-textual-data --force
+   ```
 
 ### Upgrading from Ubuntu 16.04 Xenial to 18.04 Bionic
 
@@ -413,7 +417,9 @@ instructions for other supported platforms.
 
 ### Upgrading from Debian 10 to 11
 
-1. Upgrade your server to the latest Zulip `4.x` release.
+1. Upgrade your server to the latest `5.x` release. You can only
+   upgrade to Zulip Server 6.0 and newer after completing this
+   process, since newer releases don't support Debian 10.
 
 2. As the Zulip user, stop the Zulip server and run the following
    to back up the system:
@@ -448,7 +454,7 @@ instructions for other supported platforms.
    ```bash
    rm -rf /srv/zulip-venv-cache/*
    /home/zulip/deployments/current/scripts/lib/upgrade-zulip-stage-2 \
-       /home/zulip/deployments/current/ --ignore-static-assets
+       /home/zulip/deployments/current/ --ignore-static-assets --audit-fts-indexes
    ```
 
    This will finish by restarting your Zulip server; you should now
@@ -464,13 +470,7 @@ instructions for other supported platforms.
    /home/zulip/deployments/current/scripts/setup/reindex-textual-data --force
    ```
 
-7. As root, finish by verifying the contents of the full-text indexes:
-
-   ```bash
-   /home/zulip/deployments/current/manage.py audit_fts_indexes
-   ```
-
-8. As an additional step, you can also [upgrade the postgresql version](#upgrading-postgresql).
+7. As an additional step, you can also [upgrade the PostgreSQL version](#upgrading-postgresql).
 
 ### Upgrading from Debian 9 to 10
 
@@ -525,7 +525,7 @@ instructions for other supported platforms.
    be able to navigate to its URL and confirm everything is working
    correctly.
 
-6. [Upgrade to the latest Zulip release](#upgrading-to-a-release), now
+6. [Upgrade to the latest `5.x` release](#upgrading-to-a-release), now
    that your server is running a supported operating system.
 
 7. Debian 10 has a different version of the low-level glibc
@@ -542,6 +542,9 @@ instructions for other supported platforms.
    ```bash
    /home/zulip/deployments/current/manage.py audit_fts_indexes
    ```
+
+9. [Upgrading from Debian 10 to 11](#upgrading-from-debian-10-to-11),
+   so that you are running a supported operating system.
 
 ## Upgrading PostgreSQL
 

@@ -1,5 +1,6 @@
 "use strict";
 
+const {strict: assert} = require("assert");
 const path = require("path");
 
 require("css.escape");
@@ -14,6 +15,8 @@ const test = require("./test");
 const blueslip = require("./zblueslip");
 const zjquery = require("./zjquery");
 const zpage_params = require("./zpage_params");
+
+process.env.NODE_ENV = "test";
 
 const dom = new JSDOM("", {url: "http://zulip.zulipdev.com/"});
 global.DOMParser = dom.window.DOMParser;
@@ -39,9 +42,7 @@ function immediate(f) {
 
 // Find the files we need to run.
 const files = process.argv.slice(2);
-if (files.length === 0) {
-    throw new Error("No tests found");
-}
+assert.notEqual(files.length, 0, "No tests found");
 
 // Set up our namespace helpers.
 const window = new Proxy(global, {
@@ -51,11 +52,29 @@ const window = new Proxy(global, {
     },
 });
 
+const ls_container = new Map();
+const localStorage = {
+    getItem(key) {
+        return ls_container.get(key);
+    },
+    setItem(key, val) {
+        ls_container.set(key, val);
+    },
+    /* istanbul ignore next */
+    removeItem(key) {
+        ls_container.delete(key);
+    },
+    clear() {
+        ls_container.clear();
+    },
+};
+
 // Set up Handlebars
 handlebars.hook_require();
 
 const noop = function () {};
 
+/* istanbul ignore next */
 function short_tb(tb) {
     const lines = tb.split("\n");
 
@@ -85,11 +104,12 @@ try {
     for (const file of files) {
         namespace.start();
         namespace.set_global("window", window);
-        namespace.set_global("to_$", () => window);
         namespace.set_global("location", dom.window.location);
         window.location.href = "http://zulip.zulipdev.com/#";
         namespace.set_global("setTimeout", noop);
         namespace.set_global("setInterval", noop);
+        namespace.set_global("localStorage", localStorage);
+        ls_container.clear();
         _.throttle = immediate;
         _.debounce = immediate;
         zpage_params.reset();
@@ -113,7 +133,7 @@ try {
 
         namespace.finish();
     }
-} catch (error) {
+} catch (error) /* istanbul ignore next */ {
     if (process.env.USING_INSTRUMENTED_CODE) {
         console.info(`
     TEST FAILED! Before using the --coverage option please make sure that your

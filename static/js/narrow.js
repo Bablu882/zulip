@@ -168,6 +168,12 @@ export function reset_ui_state() {
     hide_mark_as_read_turned_off_banner();
 }
 
+export function handle_middle_pane_transition() {
+    if (compose_state.composing) {
+        compose_actions.update_narrow_to_recipient_visibility();
+    }
+}
+
 export function activate(raw_operators, opts) {
     /* Main entry point for switching to a new view / message list.
        Note that for historical reasons related to the current
@@ -571,6 +577,10 @@ export function activate(raw_operators, opts) {
     typing_events.render_notifications_for_narrow();
     message_view_header.initialize();
 
+    // It is important to call this after other important updates
+    // like narrow filter and compose recipients happen.
+    handle_middle_pane_transition();
+
     msg_list.initial_core_time = new Date();
     setTimeout(() => {
         resize.resize_stream_filters_container();
@@ -850,7 +860,7 @@ export function narrow_to_next_topic() {
 }
 
 export function narrow_to_next_pm_string() {
-    const curr_pm = narrow_state.pm_string();
+    const curr_pm = narrow_state.pm_ids_string();
 
     const next_pm = topic_generator.get_next_unread_pm_string(curr_pm);
 
@@ -1031,6 +1041,7 @@ export function deactivate(coming_from_recent_topics = false) {
     condense.condense_and_collapse($("#zhome div.message_row"));
 
     reset_ui_state();
+    handle_middle_pane_transition();
     hashchange.save_narrow();
 
     if (message_lists.current.selected_id() !== -1) {

@@ -19,6 +19,7 @@ let create_item_handler;
 
 const channel = mock_esm("../../static/js/channel");
 const confirm_dialog = mock_esm("../../static/js/confirm_dialog");
+const dialog_widget = mock_esm("../../static/js/dialog_widget");
 const input_pill = mock_esm("../../static/js/input_pill");
 const typeahead_helper = mock_esm("../../static/js/typeahead_helper");
 const user_groups = mock_esm("../../static/js/user_groups", {
@@ -54,7 +55,7 @@ test_ui("can_edit", () => {
     assert.ok(!settings_user_groups.can_edit(1));
 
     settings_data.user_can_edit_user_groups = () => true;
-    user_groups.is_member_of = (group_id, user_id) => {
+    user_groups.is_direct_member_of = (user_id, group_id) => {
         assert.equal(group_id, 1);
         assert.equal(user_id, undefined);
         return false;
@@ -70,7 +71,7 @@ test_ui("can_edit", () => {
 
     page_params.is_admin = false;
     page_params.is_moderator = false;
-    user_groups.is_member_of = (group_id, user_id) => {
+    user_groups.is_direct_member_of = (user_id, group_id) => {
         assert.equal(group_id, 1);
         assert.equal(user_id, undefined);
         return true;
@@ -116,8 +117,6 @@ test_ui("populate_user_groups", ({override_rewire, mock_template}) => {
 
     user_groups.get_realm_user_groups = () => [realm_user_group];
 
-    people.get_visible_email = () => bob.email;
-
     let templates_render_called = false;
     const $fake_rendered_temp = $.create("fake_admin_user_group_list_template_rendered");
     mock_template("settings/admin_user_group_list.hbs", false, (args) => {
@@ -138,12 +137,6 @@ test_ui("populate_user_groups", ({override_rewire, mock_template}) => {
     people.get_by_user_id = (user_id) => {
         if (user_id === iago.user_id) {
             return iago;
-        }
-        if (user_id === alice.user_id) {
-            return alice;
-        }
-        if (user_id === undefined) {
-            return noop;
         }
         assert.equal(user_id, 4);
         blueslip.expect("warn", "Undefined user in function append_user");
@@ -246,9 +239,6 @@ test_ui("populate_user_groups", ({override_rewire, mock_template}) => {
                 saved_fade_out_called = true;
             };
             $(cancel_selector).css = (data) => {
-                if (typeof data === "string") {
-                    assert.equal(data, "display");
-                }
                 assert.equal(typeof data, "object");
                 assert.equal(data.display, "inline-block");
                 assert.equal(data.opacity, "0");
@@ -258,9 +248,6 @@ test_ui("populate_user_groups", ({override_rewire, mock_template}) => {
                 cancel_fade_to_called = true;
             };
             $(instructions_selector).css = (data) => {
-                if (typeof data === "string") {
-                    assert.equal(data, "display");
-                }
                 assert.equal(typeof data, "object");
                 assert.equal(data.display, "block");
                 assert.equal(data.opacity, "0");
@@ -284,17 +271,15 @@ test_ui("populate_user_groups", ({override_rewire, mock_template}) => {
     let get_by_email_called = false;
     people.get_by_email = (user_email) => {
         get_by_email_called = true;
-        if (user_email === iago.email) {
-            return iago;
+        switch (user_email) {
+            case iago.email:
+                return iago;
+            case bob.email:
+                return bob;
+            /* istanbul ignore next */
+            default:
+                throw new Error("Expected user email to be of Iago or Bob here.");
         }
-        if (user_email === bob.email) {
-            return bob;
-        }
-        throw new Error("Expected user email to be of Alice or Iago here.");
-    };
-    pills.onPillCreate = (handler) => {
-        assert.equal(typeof handler, "function");
-        handler();
     };
 
     function test_create_item(handler) {
@@ -343,10 +328,6 @@ test_ui("populate_user_groups", ({override_rewire, mock_template}) => {
     test_create_item(create_item_handler);
 
     // Tests for settings_user_groups.set_up workflow.
-    assert.equal(
-        typeof $(".organization form.admin-user-group-form").get_on_handler("submit"),
-        "function",
-    );
     assert.equal(typeof $("#user-groups").get_on_handler("click", ".delete"), "function");
     assert.equal(
         typeof $("#user-groups").get_on_handler("keypress", ".user-group h4 > span"),
@@ -363,8 +344,9 @@ test_ui("with_external_user", ({override_rewire, mock_template}) => {
 
     user_groups.get_realm_user_groups = () => [realm_user_group];
 
-    // We return noop because these are already tested, so we skip them
-    people.get_realm_users = () => noop;
+    // We return [] because these are already tested, so we skip them
+    /* istanbul ignore next */
+    people.get_realm_users = () => [];
 
     mock_template(
         "settings/admin_user_group_list.hbs",
@@ -372,9 +354,9 @@ test_ui("with_external_user", ({override_rewire, mock_template}) => {
         () => "settings/admin_user_group_list.hbs",
     );
 
-    people.get_by_user_id = () => noop;
+    people.get_by_user_id = () => "user stub";
 
-    override_rewire(user_pill, "append_person", () => noop);
+    override_rewire(user_pill, "append_person", noop);
 
     let can_edit_called = 0;
     override_rewire(settings_user_groups, "can_edit", () => {
@@ -391,30 +373,32 @@ test_ui("with_external_user", ({override_rewire, mock_template}) => {
     const $description_field_stub = $.create("fake-description-field");
     const $input_stub = $.create("fake-input");
     $user_group_stub.find = (elem) => {
-        if (elem === ".name") {
-            user_group_find_called += 1;
-            return $name_field_stub;
+        user_group_find_called += 1;
+        switch (elem) {
+            case ".name":
+                return $name_field_stub;
+            case ".description":
+                return $description_field_stub;
+            /* istanbul ignore next */
+            default:
+                throw new Error(`Unknown element ${elem}`);
         }
-        if (elem === ".description") {
-            user_group_find_called += 1;
-            return $description_field_stub;
-        }
-        throw new Error(`Unknown element ${elem}`);
     };
 
     const $pill_container_stub = $(`.pill-container[data-group-pills="${CSS.escape(1)}"]`);
     const $pill_stub = $.create("fake-pill");
     let pill_container_find_called = 0;
     $pill_container_stub.find = (elem) => {
-        if (elem === ".input") {
-            pill_container_find_called += 1;
-            return $input_stub;
+        pill_container_find_called += 1;
+        switch (elem) {
+            case ".input":
+                return $input_stub;
+            case ".pill":
+                return $pill_stub;
+            /* istanbul ignore next */
+            default:
+                throw new Error(`Unknown element ${elem}`);
         }
-        if (elem === ".pill") {
-            pill_container_find_called += 1;
-            return $pill_stub;
-        }
-        throw new Error(`Unknown element ${elem}`);
     };
 
     $input_stub.css = (property, val) => {
@@ -437,10 +421,10 @@ test_ui("with_external_user", ({override_rewire, mock_template}) => {
         assert.equal(value, "0.5");
     };
 
-    // We return noop because these are already tested, so we skip them
-    $pill_container_stub.children = () => noop;
+    // We return [] because these are already tested, so we skip them
+    $pill_container_stub.children = () => [];
 
-    $("#user-groups").append = () => noop;
+    $("#user-groups").append = noop;
 
     reset_test_setup($pill_container_stub);
 
@@ -519,12 +503,12 @@ test_ui("on_events", ({override_rewire, mock_template}) => {
     override_rewire(settings_user_groups, "can_edit", () => true);
 
     (function test_admin_user_group_form_submit_triggered() {
-        const handler = $(".organization form.admin-user-group-form").get_on_handler("submit");
+        const handler = settings_user_groups.add_user_group;
         const event = {
             stopPropagation: noop,
             preventDefault: noop,
         };
-        const $fake_this = $.create("fake-form.admin-user-group-form");
+        const $fake_this = $.create("#add-user-group-form");
         const fake_object_array = [
             {
                 name: "fake-name",
@@ -545,39 +529,39 @@ test_ui("on_events", ({override_rewire, mock_template}) => {
             assert.deepEqual(opts.data, data);
 
             (function test_post_success() {
-                $("#admin-user-group-status").show();
-                $("form.admin-user-group-form input[type='text']").val("fake-content");
+                $("#dialog_error").show();
+                $("#add-user-group-form input[type='text']").val("fake-content");
                 ui_report.success = (text, ele) => {
                     assert.equal(text, "translated HTML: User group added!");
-                    assert.equal(ele, $("#admin-user-group-status"));
+                    assert.equal(ele, $("#dialog_error"));
                 };
+                dialog_widget.close_modal = () => {};
 
                 opts.success();
 
-                assert.ok(!$("#admin-user-group-status").visible());
-                assert.equal($("form.admin-user-group-form input[type='text']").val(), "");
+                assert.ok(!$("#dialog_error").visible());
             })();
 
             (function test_post_error() {
-                $("#admin-user-group-status").show();
+                $("#dialog_error").show();
                 ui_report.error = (error_msg, error_obj, ele) => {
                     const xhr = {
                         responseText: '{"msg":"fake-msg"}',
                     };
                     assert.equal(error_msg, "translated HTML: Failed");
                     assert.deepEqual(error_obj, xhr);
-                    assert.equal(ele, $("#admin-user-group-status"));
+                    assert.equal(ele, $("#dialog_error"));
                 };
                 const xhr = {
                     responseText: '{"msg":"fake-msg", "attrib":"val"}',
                 };
                 opts.error(xhr);
 
-                assert.ok(!$("#admin-user-group-status").visible());
+                assert.ok(!$("#dialog_error").visible());
             })();
         };
 
-        handler.call($fake_this, event);
+        handler(event);
     })();
 
     (function test_user_groups_delete_click_triggered() {
@@ -621,6 +605,7 @@ test_ui("on_events", ({override_rewire, mock_template}) => {
     (function test_do_not_blur() {
         const blur_event_classes = [".name", ".description", ".input"];
         let api_endpoint_called = false;
+        /* istanbul ignore next */
         channel.post = () => {
             api_endpoint_called = true;
         };
@@ -658,10 +643,8 @@ test_ui("on_events", ({override_rewire, mock_template}) => {
 
             api_endpoint_called = false;
             $fake_this.closest = (class_name) => {
-                if (class_name === ".typeahead") {
-                    return [1];
-                }
-                return [];
+                assert.equal(class_name, ".typeahead");
+                return [1];
             };
             handler.call($fake_this, event);
             assert.ok(!api_endpoint_called);
@@ -755,9 +738,6 @@ test_ui("on_events", ({override_rewire, mock_template}) => {
             cancel_fade_out_called = true;
         };
         $(saved_selector).css = (data) => {
-            if (typeof data === "string") {
-                assert.equal(data, "display");
-            }
             assert.equal(typeof data, "object");
             assert.equal(data.display, "inline-block");
             assert.equal(data.opacity, "0");

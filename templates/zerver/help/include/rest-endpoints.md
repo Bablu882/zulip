@@ -31,6 +31,7 @@
 * [Get all subscribers](/api/get-subscribers)
 * [Update subscription settings](/api/update-subscription-settings)
 * [Get all streams](/api/get-streams)
+* [Get a stream by ID](/api/get-stream-by-id)
 * [Get stream ID](/api/get-stream-id)
 * [Create a stream](/api/create-stream)
 * [Update a stream](/api/update-stream)
@@ -61,6 +62,10 @@
 * [Update a user group](/api/update-user-group)
 * [Delete a user group](/api/remove-user-group)
 * [Update user group members](/api/update-user-group-members)
+* [Update user group subgroups](/api/update-user-group-subgroups)
+* [Get user group membership status](/api/get-is-user-group-member)
+* [Get user group members](/api/get-user-group-members)
+* [Get subgroups of user group](/api/get-user-group-subgroups)
 * [Mute a user](/api/mute-user)
 * [Unmute a user](/api/unmute-user)
 

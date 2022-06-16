@@ -1,17 +1,14 @@
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import orjson
-from django.http import HttpResponse
 from django.utils.timezone import now as timezone_now
 
 from corporate.lib.stripe import add_months, update_sponsorship_status
 from corporate.models import Customer, CustomerPlan, LicenseLedger, get_customer_by_realm
-from zerver.lib.actions import (
-    do_create_multiuse_invite_link,
-    do_send_realm_reactivation_email,
-    do_set_realm_property,
-)
+from zerver.actions.invites import do_create_multiuse_invite_link
+from zerver.actions.realm_settings import do_send_realm_reactivation_email, do_set_realm_property
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.test_helpers import reset_emails_in_zulip_realm
 from zerver.models import (
@@ -24,13 +21,16 @@ from zerver.models import (
     get_realm,
 )
 
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
+
 
 class TestSupportEndpoint(ZulipTestCase):
     def test_search(self) -> None:
         reset_emails_in_zulip_realm()
 
         def assert_user_details_in_html_response(
-            html_response: HttpResponse, full_name: str, email: str, role: str
+            html_response: "TestHttpResponse", full_name: str, email: str, role: str
         ) -> None:
             self.assert_in_success_response(
                 [
@@ -43,7 +43,7 @@ class TestSupportEndpoint(ZulipTestCase):
                 html_response,
             )
 
-        def check_hamlet_user_query_result(result: HttpResponse) -> None:
+        def check_hamlet_user_query_result(result: "TestHttpResponse") -> None:
             assert_user_details_in_html_response(
                 result, "King Hamlet", self.example_email("hamlet"), "Member"
             )
@@ -59,17 +59,17 @@ class TestSupportEndpoint(ZulipTestCase):
                 result,
             )
 
-        def check_othello_user_query_result(result: HttpResponse) -> None:
+        def check_othello_user_query_result(result: "TestHttpResponse") -> None:
             assert_user_details_in_html_response(
                 result, "Othello, the Moor of Venice", self.example_email("othello"), "Member"
             )
 
-        def check_polonius_user_query_result(result: HttpResponse) -> None:
+        def check_polonius_user_query_result(result: "TestHttpResponse") -> None:
             assert_user_details_in_html_response(
                 result, "Polonius", self.example_email("polonius"), "Guest"
             )
 
-        def check_zulip_realm_query_result(result: HttpResponse) -> None:
+        def check_zulip_realm_query_result(result: "TestHttpResponse") -> None:
             zulip_realm = get_realm("zulip")
             first_human_user = zulip_realm.get_first_human_user()
             assert first_human_user is not None
@@ -90,7 +90,7 @@ class TestSupportEndpoint(ZulipTestCase):
                 result,
             )
 
-        def check_lear_realm_query_result(result: HttpResponse) -> None:
+        def check_lear_realm_query_result(result: "TestHttpResponse") -> None:
             lear_realm = get_realm("lear")
             self.assert_in_success_response(
                 [
@@ -116,7 +116,7 @@ class TestSupportEndpoint(ZulipTestCase):
             )
 
         def check_preregistration_user_query_result(
-            result: HttpResponse, email: str, invite: bool = False
+            result: "TestHttpResponse", email: str, invite: bool = False
         ) -> None:
             self.assert_in_success_response(
                 [
@@ -145,7 +145,7 @@ class TestSupportEndpoint(ZulipTestCase):
                     result,
                 )
 
-        def check_realm_creation_query_result(result: HttpResponse, email: str) -> None:
+        def check_realm_creation_query_result(result: "TestHttpResponse", email: str) -> None:
             self.assert_in_success_response(
                 [
                     '<span class="label">preregistration user</span>\n',
@@ -156,7 +156,7 @@ class TestSupportEndpoint(ZulipTestCase):
                 result,
             )
 
-        def check_multiuse_invite_link_query_result(result: HttpResponse) -> None:
+        def check_multiuse_invite_link_query_result(result: "TestHttpResponse") -> None:
             self.assert_in_success_response(
                 [
                     '<span class="label">multiuse invite</span>\n',
@@ -166,7 +166,7 @@ class TestSupportEndpoint(ZulipTestCase):
                 result,
             )
 
-        def check_realm_reactivation_link_query_result(result: HttpResponse) -> None:
+        def check_realm_reactivation_link_query_result(result: "TestHttpResponse") -> None:
             self.assert_in_success_response(
                 [
                     '<span class="label">realm reactivation</span>\n',
@@ -261,7 +261,7 @@ class TestSupportEndpoint(ZulipTestCase):
             check_preregistration_user_query_result(result, self.nonreg_email("test"))
             check_zulip_realm_query_result(result)
 
-            invite_expires_in_days = 10
+            invite_expires_in_minutes = 10 * 24 * 60
             stream_ids = [self.get_stream_id("Denmark")]
             invitee_emails = [self.nonreg_email("test1")]
             self.client_post(
@@ -269,7 +269,7 @@ class TestSupportEndpoint(ZulipTestCase):
                 {
                     "invitee_emails": invitee_emails,
                     "stream_ids": orjson.dumps(stream_ids).decode(),
-                    "invite_expires_in_days": invite_expires_in_days,
+                    "invite_expires_in_minutes": invite_expires_in_minutes,
                     "invite_as": PreregistrationUser.INVITE_AS["MEMBER"],
                 },
             )
@@ -285,7 +285,7 @@ class TestSupportEndpoint(ZulipTestCase):
             do_create_multiuse_invite_link(
                 self.example_user("hamlet"),
                 invited_as=1,
-                invite_expires_in_days=invite_expires_in_days,
+                invite_expires_in_minutes=invite_expires_in_minutes,
             )
             result = self.client_get("/activity/support", {"q": "zulip"})
             check_multiuse_invite_link_query_result(result)

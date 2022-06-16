@@ -101,7 +101,11 @@ def build_email(
                 stringified = str(Address(addr_spec=to_user.delivery_email))
             to_emails.append(stringified)
 
-    extra_headers = {}
+    # Attempt to suppress all auto-replies.  This header originally
+    # came out of Microsoft Outlook and friends, but seems reasonably
+    # commonly-recognized.
+    extra_headers = {"X-Auto-Response-Suppress": "All"}
+
     if realm is not None:
         # formaddr is meant for formatting (display_name, email_address) pair for headers like "To",
         # but we can use its utility for formatting the List-Id header, as it follows the same format,
@@ -291,12 +295,7 @@ def send_email(
         raise EmailNotDeliveredException
 
 
-@backoff.on_exception(
-    backoff.expo,
-    OSError,
-    max_tries=MAX_CONNECTION_TRIES,
-    logger=None,  # type: ignore[arg-type] # https://github.com/gleb-chipiga/backoff-stubs/pull/2
-)
+@backoff.on_exception(backoff.expo, OSError, max_tries=MAX_CONNECTION_TRIES, logger=None)
 def initialize_connection(connection: Optional[BaseEmailBackend] = None) -> BaseEmailBackend:
     if not connection:
         connection = get_connection()
@@ -597,7 +596,7 @@ def log_email_config_errors() -> None:
     The purpose of this function is to log (potential) config errors,
     but without raising an exception.
     """
-    if settings.EMAIL_HOST_USER and not settings.EMAIL_HOST_PASSWORD:
+    if settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD is None:
         logger.error(
             "An SMTP username was set (EMAIL_HOST_USER), but password is unset (EMAIL_HOST_PASSWORD)."
         )

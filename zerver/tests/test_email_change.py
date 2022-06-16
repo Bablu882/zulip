@@ -11,12 +11,9 @@ from confirmation.models import (
     create_confirmation_link,
     generate_key,
 )
-from zerver.lib.actions import (
-    do_deactivate_realm,
-    do_deactivate_user,
-    do_set_realm_property,
-    do_start_email_change_process,
-)
+from zerver.actions.realm_settings import do_deactivate_realm, do_set_realm_property
+from zerver.actions.user_settings import do_start_email_change_process
+from zerver.actions.users import do_deactivate_user
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.models import (
     EmailChangeStatus,
@@ -241,8 +238,9 @@ class EmailChangeTestCase(ZulipTestCase):
         self.login("hamlet")
         url = "/json/settings"
         result = self.client_patch(url, data)
-        self.assertEqual("success", result.json()["result"])
-        self.assertEqual("", result.json()["msg"])
+        response_dict = self.assert_json_success(result)
+        self.assertEqual("success", response_dict["result"])
+        self.assertEqual("", response_dict["msg"])
 
     def test_change_delivery_email_end_to_end_with_admins_visibility(self) -> None:
         user_profile = self.example_user("hamlet")

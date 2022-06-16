@@ -5,7 +5,7 @@
 # Django itself
 Django[argon2]==3.2.*
 
-# needed for Literal, TypedDict
+# needed for NotRequired, ParamSpec
 typing-extensions
 
 # Needed for rendering backend templates
@@ -26,9 +26,14 @@ Pillow
 # Needed for building complex DB queries
 SQLAlchemy==1.4.*
 
-# Needed for S3 file uploads
+# Needed for S3 file uploads and other AWS tools
 boto3
+
+# The runtime-relevant part of boto3-stubs (see mypy.in)
 mypy-boto3-s3
+mypy-boto3-ses
+mypy-boto3-sns
+mypy-boto3-sqs
 
 # Needed for integrations
 defusedxml
@@ -84,7 +89,7 @@ redis
 sourcemap
 
 # Tornado used for server->client push system
-tornado==4.*  # https://github.com/zulip/zulip/issues/8913
+tornado
 
 # Fast JSON parser
 orjson
@@ -160,7 +165,6 @@ requests-oauthlib
 
 # For OpenAPI schema validation.
 openapi-core
-importlib-resources ; python_version < "3.9"  # for jsonschema
 
 # For reporting errors to sentry.io
 sentry-sdk

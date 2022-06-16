@@ -342,11 +342,25 @@ exports.fixtures = {
         value: 42,
     },
 
+    realm__update__org_type: {
+        type: "realm",
+        op: "update",
+        property: "org_type",
+        value: 50,
+    },
+
     realm__update__signup_notifications_stream_id: {
         type: "realm",
         op: "update",
         property: "signup_notifications_stream_id",
         value: 41,
+    },
+
+    realm__update__want_advertise_in_communities_directory: {
+        type: "realm",
+        op: "update",
+        property: "want_advertise_in_communities_directory",
+        value: false,
     },
 
     realm__update_dict__default: {
@@ -721,6 +735,7 @@ exports.fixtures = {
             description: "mobile folks",
             members: [1],
             is_system_group: false,
+            direct_subgroup_ids: [2],
         },
     },
 
@@ -729,6 +744,13 @@ exports.fixtures = {
         op: "add_members",
         group_id: 1,
         user_ids: [2],
+    },
+
+    user_group__add_subgroups: {
+        type: "user_group",
+        op: "add_subgroups",
+        group_id: 1,
+        direct_subgroup_ids: [3],
     },
 
     user_group__remove: {
@@ -742,6 +764,13 @@ exports.fixtures = {
         op: "remove_members",
         group_id: 3,
         user_ids: [99, 100],
+    },
+
+    user_group__remove_subgroups: {
+        type: "user_group",
+        op: "remove_subgroups",
+        group_id: 1,
+        direct_subgroup_ids: [3],
     },
 
     user_group__update: {
@@ -815,6 +844,13 @@ exports.fixtures = {
         type: "user_settings",
         op: "update",
         property: "dense_mode",
+        value: true,
+    },
+
+    user_settings__display_emoji_reaction_users: {
+        type: "user_settings",
+        op: "update",
+        property: "display_emoji_reaction_users",
         value: true,
     },
 

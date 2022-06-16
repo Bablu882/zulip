@@ -1,13 +1,12 @@
 import $ from "jquery";
 
-import marked from "../third/marked/lib/marked";
-
 import * as channel from "./channel";
 import * as common from "./common";
 import * as dark_theme from "./dark_theme";
 import * as diff_theme from "./diff_theme";
 import * as feedback_widget from "./feedback_widget";
 import {$t} from "./i18n";
+import * as markdown from "./markdown";
 import * as scroll_bar from "./scroll_bar";
 
 /*
@@ -67,7 +66,7 @@ export function switch_to_light_theme() {
             dark_theme.disable();
             feedback_widget.show({
                 populate($container) {
-                    const rendered_msg = marked(data.msg).trim();
+                    const rendered_msg = markdown.parse_non_message(data.msg);
                     $container.html(rendered_msg);
                 },
                 on_undo() {
@@ -89,7 +88,7 @@ export function switch_to_dark_theme() {
             dark_theme.enable();
             feedback_widget.show({
                 populate($container) {
-                    const rendered_msg = marked(data.msg).trim();
+                    const rendered_msg = markdown.parse_non_message(data.msg);
                     $container.html(rendered_msg);
                 },
                 on_undo() {
@@ -133,7 +132,7 @@ export function enter_fluid_mode() {
             scroll_bar.set_layout_width();
             feedback_widget.show({
                 populate($container) {
-                    const rendered_msg = marked(data.msg).trim();
+                    const rendered_msg = markdown.parse_non_message(data.msg);
                     $container.html(rendered_msg);
                 },
                 on_undo() {
@@ -155,7 +154,7 @@ export function enter_fixed_mode() {
             scroll_bar.set_layout_width();
             feedback_widget.show({
                 populate($container) {
-                    const rendered_msg = marked(data.msg).trim();
+                    const rendered_msg = markdown.parse_non_message(data.msg);
                     $container.html(rendered_msg);
                 },
                 on_undo() {

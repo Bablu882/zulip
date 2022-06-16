@@ -221,7 +221,7 @@ export function user_ids_string_to_emails_string(user_ids_string) {
 
 export function user_ids_string_to_ids_array(user_ids_string) {
     const user_ids = user_ids_string.split(",");
-    const ids = user_ids.map((id) => Number(id));
+    const ids = user_ids.map(Number);
     return ids;
 }
 
@@ -274,9 +274,6 @@ export function get_user_time(user_id) {
 
 export function get_user_type(user_id) {
     const user_profile = get_by_user_id(user_id);
-    if (user_profile.is_bot) {
-        return $t({defaultMessage: "Bot"});
-    }
 
     return settings_config.user_role_map.get(user_profile.role);
 }

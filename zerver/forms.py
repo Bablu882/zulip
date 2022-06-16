@@ -21,13 +21,17 @@ from markupsafe import Markup as mark_safe
 from two_factor.forms import AuthenticationTokenForm as TwoFactorAuthenticationTokenForm
 from two_factor.utils import totp_digits
 
+from zerver.actions.user_settings import do_change_password
 from zerver.decorator import rate_limit_request_by_ip
-from zerver.lib.actions import do_change_password, email_not_system_bot
-from zerver.lib.email_validation import email_allowed_for_realm
+from zerver.lib.email_validation import (
+    email_allowed_for_realm,
+    email_reserved_for_system_bots_error,
+)
 from zerver.lib.exceptions import JsonableError, RateLimited
 from zerver.lib.name_restrictions import is_disposable_domain, is_reserved_subdomain
 from zerver.lib.rate_limiter import RateLimitedObject
 from zerver.lib.send_email import FromAddress, send_email
+from zerver.lib.soft_deactivation import queue_soft_reactivation
 from zerver.lib.subdomains import get_subdomain, is_root_domain_available
 from zerver.lib.users import check_full_name
 from zerver.models import (
@@ -39,6 +43,7 @@ from zerver.models import (
     email_to_domain,
     get_realm,
     get_user_by_delivery_email,
+    is_cross_realm_bot_email,
 )
 from zproject.backends import check_password_strength, email_auth_enabled, email_belongs_to_ldap
 
@@ -224,6 +229,17 @@ class HomepageForm(forms.Form):
         return email
 
 
+def email_not_system_bot(email: str) -> None:
+    if is_cross_realm_bot_email(email):
+        msg = email_reserved_for_system_bots_error(email)
+        code = msg
+        raise ValidationError(
+            msg,
+            code=code,
+            params=dict(deactivated=False),
+        )
+
+
 def email_is_not_disposable(email: str) -> None:
     if is_disposable_domain(email_to_domain(email)):
         raise ValidationError(_("Please use your real email address."))
@@ -259,6 +275,7 @@ class LoggingSetPasswordForm(SetPasswordForm):
         return new_password
 
     def save(self, commit: bool = True) -> UserProfile:
+        assert isinstance(self.user, UserProfile)
         do_change_password(self.user, self.cleaned_data["new_password1"], commit=commit)
         return self.user
 
@@ -275,7 +292,7 @@ def generate_password_reset_url(
 class ZulipPasswordResetForm(PasswordResetForm):
     def save(
         self,
-        domain_override: Optional[bool] = None,
+        domain_override: Optional[str] = None,
         subject_template_name: str = "registration/password_reset_subject.txt",
         email_template_name: str = "registration/password_reset_email.html",
         use_https: bool = False,
@@ -347,6 +364,7 @@ class ZulipPasswordResetForm(PasswordResetForm):
         if user is not None:
             context["active_account_in_realm"] = True
             context["reset_url"] = generate_password_reset_url(user, token_generator)
+            queue_soft_reactivation(user.id)
             send_email(
                 "zerver/emails/password_reset",
                 to_user_ids=[user.id],
@@ -400,6 +418,8 @@ class CreateUserForm(forms.Form):
 
 
 class OurAuthenticationForm(AuthenticationForm):
+    logger = logging.getLogger("zulip.auth.OurAuthenticationForm")
+
     def clean(self) -> Dict[str, Any]:
         username = self.cleaned_data.get("username")
         password = self.cleaned_data.get("password")
@@ -446,16 +466,14 @@ class OurAuthenticationForm(AuthenticationForm):
                 raise ValidationError(error_message)
 
             if return_data.get("invalid_subdomain"):
-                logging.warning(
-                    "User %s attempted password login to wrong subdomain %s", username, subdomain
+                self.logger.info(
+                    "User attempted password login to wrong subdomain %s. Matching accounts: %s",
+                    subdomain,
+                    return_data.get("matching_user_ids_in_different_realms"),
                 )
-                error_message = _(
-                    "Your Zulip account {username} is not a member of the "
-                    + "organization associated with this subdomain.  "
-                    + "Please contact your organization administrator with any questions."
-                )
-                error_message = error_message.format(username=username)
-                raise ValidationError(error_message)
+                # We don't want to leak information by revealing there are matching accounts
+                # on different subdomain - so we just fall through to the default error.
+                assert self.user_cache is None
 
             if self.user_cache is None:
                 raise forms.ValidationError(

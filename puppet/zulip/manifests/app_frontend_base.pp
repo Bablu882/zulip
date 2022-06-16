@@ -12,10 +12,10 @@ class zulip::app_frontend_base {
     # package already includes the client.  This may get us a more
     # recent client than the database server is configured to be,
     # ($zulip::postgresql_common::version), but they're compatible.
-    zulip::safepackage { 'postgresql-client': ensure => 'installed' }
+    zulip::safepackage { 'postgresql-client': ensure => installed }
   }
   # For Slack import
-  zulip::safepackage { 'unzip': ensure => 'installed' }
+  zulip::safepackage { 'unzip': ensure => installed }
 
   file { '/etc/nginx/zulip-include/app':
     require => Package[$zulip::common::nginx],
@@ -119,12 +119,6 @@ class zulip::app_frontend_base {
     notify  => Service[$zulip::common::supervisor_service],
   }
 
-  $uwsgi_rolling_restart = zulipconf('application_server', 'rolling_restart', '')
-  if $uwsgi_rolling_restart == '' {
-    file { '/home/zulip/deployments/uwsgi-control':
-      ensure => absent,
-    }
-  }
   $uwsgi_listen_backlog_limit = zulipconf('application_server', 'uwsgi_listen_backlog_limit', 128)
   $uwsgi_buffer_size = zulipconf('application_server', 'uwsgi_buffer_size', 8192)
   $uwsgi_processes = zulipconf('application_server', 'uwsgi_processes', $uwsgi_default_processes)
@@ -161,17 +155,17 @@ class zulip::app_frontend_base {
     mode   => '0755',
   }
   file { '/home/zulip/logs':
-    ensure => 'directory',
+    ensure => directory,
     owner  => 'zulip',
     group  => 'zulip',
   }
   file { '/home/zulip/prod-static':
-    ensure => 'directory',
+    ensure => directory,
     owner  => 'zulip',
     group  => 'zulip',
   }
   file { '/home/zulip/deployments':
-    ensure => 'directory',
+    ensure => directory,
     owner  => 'zulip',
     group  => 'zulip',
   }
@@ -189,14 +183,14 @@ class zulip::app_frontend_base {
   }
 
   file { '/var/log/zulip/queue_error':
-    ensure => 'directory',
+    ensure => directory,
     owner  => 'zulip',
     group  => 'zulip',
     mode   => '0640',
   }
 
   file { '/var/log/zulip/queue_stats':
-    ensure => 'directory',
+    ensure => directory,
     owner  => 'zulip',
     group  => 'zulip',
     mode   => '0640',
@@ -219,5 +213,9 @@ class zulip::app_frontend_base {
     group  => 'root',
     mode   => '0644',
     source => 'puppet:///modules/zulip/cron.d/fetch-tor-exit-nodes',
+  }
+  # This was originally added with a typo in the name.
+  file { '/etc/cron.d/fetch-for-exit-nodes':
+    ensure => absent,
   }
 }

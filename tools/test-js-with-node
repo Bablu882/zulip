@@ -44,6 +44,8 @@ def make_set(files: List[str]) -> Set[str]:
 # We do not yet require 100% line coverage for these files:
 EXEMPT_FILES = make_set(
     [
+        "frontend_tests/node_tests/event_status.js",
+        "frontend_tests/zjsunit/mdiff.js",
         "static/js/about_zulip.js",
         "static/js/add_subscribers_pill.js",
         "static/js/admin.js",
@@ -88,6 +90,7 @@ EXEMPT_FILES = make_set(
         "static/js/gear_menu.js",
         "static/js/giphy.js",
         "static/js/global.d.ts",
+        "static/js/hash_util.js",
         "static/js/hashchange.js",
         "static/js/hbs.d.ts",
         "static/js/hotkey.js",
@@ -161,6 +164,7 @@ EXEMPT_FILES = make_set(
         "static/js/settings_streams.js",
         "static/js/settings_toggle.js",
         "static/js/settings_ui.js",
+        "static/js/settings_user_groups.js",
         "static/js/settings_users.js",
         "static/js/setup.js",
         "static/js/spectators.js",
@@ -373,14 +377,16 @@ def read_coverage() -> Any:
 
 
 def enforce_proper_coverage(coverage_json: Any) -> bool:
-    all_js_files = set(
-        glob.glob("static/js/*.js")
-        + glob.glob("static/js/*.ts")
-        + glob.glob("static/shared/js/*.js")
-        + glob.glob("static/shared/js/*.ts")
-        + glob.glob("static/js/billing/*.js"),
-    )
-    enforce_fully_covered = all_js_files - EXEMPT_FILES
+    all_js_files = {
+        *glob.glob("frontend_tests/node_tests/*.js"),
+        *glob.glob("frontend_tests/zjsunit/*.js"),
+        *glob.glob("static/js/*.js"),
+        *glob.glob("static/js/*.ts"),
+        *glob.glob("static/shared/js/*.js"),
+        *glob.glob("static/shared/js/*.ts"),
+        *glob.glob("static/js/billing/*.js"),
+    }
+    enforce_fully_covered = sorted(all_js_files - EXEMPT_FILES)
 
     coverage_lost = False
     for relative_path in enforce_fully_covered:

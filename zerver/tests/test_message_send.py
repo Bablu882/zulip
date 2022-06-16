@@ -1,27 +1,21 @@
 import datetime
-from typing import Any, List, Mapping, Optional, Set
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Set
 from unittest import mock
 
 import orjson
 import pytz
 from django.conf import settings
 from django.db.models import Q
-from django.http import HttpResponse
 from django.test import override_settings
 from django.utils.timezone import now as timezone_now
 
-from zerver.lib.actions import (
+from zerver.actions.create_realm import do_create_realm
+from zerver.actions.create_user import do_create_user
+from zerver.actions.message_send import (
     build_message_send_dict,
     check_message,
     check_send_stream_message,
-    do_add_realm_domain,
-    do_change_can_forge_sender,
-    do_change_stream_post_policy,
-    do_create_realm,
-    do_create_user,
-    do_deactivate_user,
     do_send_messages,
-    do_set_realm_property,
     extract_private_recipients,
     extract_stream_indicator,
     internal_prep_private_message,
@@ -32,6 +26,10 @@ from zerver.lib.actions import (
     internal_send_stream_message_by_name,
     send_rate_limited_pm_notification_to_bot_owner,
 )
+from zerver.actions.realm_domains import do_add_realm_domain
+from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.streams import do_change_stream_post_policy
+from zerver.actions.users import do_change_can_forge_sender, do_deactivate_user
 from zerver.lib.addressee import Addressee
 from zerver.lib.cache import cache_delete, get_stream_cache_key
 from zerver.lib.exceptions import JsonableError
@@ -66,6 +64,9 @@ from zerver.models import (
     get_user,
 )
 from zerver.views.message_send import InvalidMirrorInput
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
 
 
 class MessagePOSTTest(ZulipTestCase):
@@ -1351,7 +1352,7 @@ class ScheduledMessageTest(ZulipTestCase):
         tz_guess: str = "",
         delivery_type: str = "send_later",
         realm_str: str = "zulip",
-    ) -> HttpResponse:
+    ) -> "TestHttpResponse":
         self.login("hamlet")
 
         topic_name = ""
@@ -1545,6 +1546,7 @@ class StreamMessagesTest(ZulipTestCase):
         stream = get_stream("Denmark", realm)
         topic_name = "lunch"
         recipient = stream.recipient
+        assert recipient is not None
         sending_client = make_client(name="test suite")
 
         for i in range(num_extra_users):

@@ -127,6 +127,7 @@ const bot_botson = {
     full_name: "Bot Botson",
     is_bot: true,
     bot_owner_id: isaac.user_id,
+    role: 300,
 };
 
 const moderator = {
@@ -525,7 +526,7 @@ test_people("user_type", () => {
     assert.equal(people.get_user_type(guest.user_id), $t({defaultMessage: "Guest"}));
     assert.equal(people.get_user_type(realm_owner.user_id), $t({defaultMessage: "Owner"}));
     assert.equal(people.get_user_type(moderator.user_id), $t({defaultMessage: "Moderator"}));
-    assert.equal(people.get_user_type(bot_botson.user_id), $t({defaultMessage: "Bot"}));
+    assert.equal(people.get_user_type(bot_botson.user_id), $t({defaultMessage: "Moderator"}));
 });
 
 test_people("updates", () => {
@@ -835,9 +836,13 @@ test_people("extract_people_from_message", ({override_rewire}) => {
     assert.ok(reported);
 
     // Get line coverage
-    people.__Rewire__("report_late_add", () => {
-        throw new Error("unexpected late add");
-    });
+    people.__Rewire__(
+        "report_late_add",
+        /* istanbul ignore next */
+        () => {
+            throw new Error("unexpected late add");
+        },
+    );
 
     message = {
         type: "private",

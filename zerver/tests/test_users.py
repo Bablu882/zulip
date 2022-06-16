@@ -12,22 +12,20 @@ from django.test import override_settings
 from django.utils.timezone import now as timezone_now
 
 from confirmation.models import Confirmation
-from zerver.lib.actions import (
+from zerver.actions.create_user import do_create_user, do_reactivate_user
+from zerver.actions.invites import do_create_multiuse_invite_link, do_invite_users
+from zerver.actions.message_send import get_recipient_info
+from zerver.actions.muted_users import do_mute_user
+from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.users import (
     change_user_is_active,
-    create_users,
     do_change_can_create_users,
     do_change_user_role,
-    do_create_multiuse_invite_link,
-    do_create_user,
     do_deactivate_user,
     do_delete_user,
-    do_invite_users,
-    do_mute_user,
-    do_reactivate_user,
-    do_set_realm_property,
-    get_recipient_info,
 )
 from zerver.lib.avatar import avatar_url, get_gravatar_url
+from zerver.lib.bulk_create import create_users
 from zerver.lib.create_user import copy_default_settings
 from zerver.lib.events import do_events_register
 from zerver.lib.exceptions import JsonableError
@@ -207,8 +205,7 @@ class PermissionTest(ZulipTestCase):
         do_change_user_role(iago, UserProfile.ROLE_REALM_OWNER, acting_user=None)
 
         result = self.client_get("/json/users")
-        self.assert_json_success(result)
-        members = result.json()["members"]
+        members = self.assert_json_success(result)["members"]
         iago_dict = find_dict(members, "email", iago.email)
         self.assertTrue(iago_dict["is_owner"])
         othello_dict = find_dict(members, "email", othello.email)
@@ -268,8 +265,7 @@ class PermissionTest(ZulipTestCase):
 
         # Make sure we see is_admin flag in /json/users
         result = self.client_get("/json/users")
-        self.assert_json_success(result)
-        members = result.json()["members"]
+        members = self.assert_json_success(result)["members"]
         desdemona_dict = find_dict(members, "email", desdemona.email)
         self.assertTrue(desdemona_dict["is_admin"])
         othello_dict = find_dict(members, "email", othello.email)
@@ -313,12 +309,11 @@ class PermissionTest(ZulipTestCase):
 
         # First, verify client_gravatar works normally
         result = self.client_get("/json/users", {"client_gravatar": "true"})
-        self.assert_json_success(result)
-        members = result.json()["members"]
+        members = self.assert_json_success(result)["members"]
         hamlet = find_dict(members, "user_id", user.id)
         self.assertEqual(hamlet["email"], user.email)
         self.assertIsNone(hamlet["avatar_url"])
-        self.assertNotIn("delivery_email", hamlet)
+        self.assertEqual(hamlet["delivery_email"], user.delivery_email)
 
         # Also verify the /events code path.  This is a bit hacky, but
         # we need to verify client_gravatar is not being overridden.
@@ -326,7 +321,7 @@ class PermissionTest(ZulipTestCase):
             "zerver.lib.events.request_event_queue", return_value=None
         ) as mock_request_event_queue:
             with self.assertRaises(JsonableError):
-                do_events_register(user, get_client("website"), client_gravatar=True)
+                do_events_register(user, user.realm, get_client("website"), client_gravatar=True)
             self.assertEqual(mock_request_event_queue.call_args_list[0][0][3], True)
 
         #############################################################
@@ -340,15 +335,14 @@ class PermissionTest(ZulipTestCase):
                 acting_user=None,
             )
         result = self.client_get("/json/users", {"client_gravatar": "true"})
-        self.assert_json_success(result)
-        members = result.json()["members"]
+        members = self.assert_json_success(result)["members"]
         hamlet = find_dict(members, "user_id", user.id)
         self.assertEqual(hamlet["email"], f"user{user.id}@zulip.testserver")
         # Note that the Gravatar URL should still be computed from the
         # `delivery_email`; otherwise, we won't be able to serve the
         # user's Gravatar.
         self.assertEqual(hamlet["avatar_url"], get_gravatar_url(user.delivery_email, 1))
-        self.assertNotIn("delivery_email", hamlet)
+        self.assertEqual(hamlet["delivery_email"], user.delivery_email)
 
         # Also verify the /events code path.  This is a bit hacky, but
         # basically we want to verify client_gravatar is being
@@ -357,7 +351,7 @@ class PermissionTest(ZulipTestCase):
             "zerver.lib.events.request_event_queue", return_value=None
         ) as mock_request_event_queue:
             with self.assertRaises(JsonableError):
-                do_events_register(user, get_client("website"), client_gravatar=True)
+                do_events_register(user, user.realm, get_client("website"), client_gravatar=True)
             self.assertEqual(mock_request_event_queue.call_args_list[0][0][3], False)
 
         # client_gravatar is still turned off for admins.  In theory,
@@ -368,8 +362,7 @@ class PermissionTest(ZulipTestCase):
         user.refresh_from_db()
         self.login_user(admin)
         result = self.client_get("/json/users", {"client_gravatar": "true"})
-        self.assert_json_success(result)
-        members = result.json()["members"]
+        members = self.assert_json_success(result)["members"]
         hamlet = find_dict(members, "user_id", user.id)
         self.assertEqual(hamlet["email"], f"user{user.id}@zulip.testserver")
         self.assertEqual(hamlet["avatar_url"], get_gravatar_url(user.delivery_email, 1))
@@ -797,12 +790,12 @@ class QueryCountTest(ZulipTestCase):
         ]
         streams = [get_stream(stream_name, realm) for stream_name in stream_names]
 
-        invite_expires_in_days = 4
+        invite_expires_in_minutes = 4 * 24 * 60
         do_invite_users(
             user_profile=self.example_user("hamlet"),
             invitee_emails=["fred@zulip.com"],
             streams=streams,
-            invite_expires_in_days=invite_expires_in_days,
+            invite_expires_in_minutes=invite_expires_in_minutes,
         )
 
         prereg_user = PreregistrationUser.objects.get(email="fred@zulip.com")
@@ -811,7 +804,7 @@ class QueryCountTest(ZulipTestCase):
 
         with queries_captured() as queries:
             with cache_tries_captured() as cache_tries:
-                with self.tornado_redirected_to_list(events, expected_num_events=10):
+                with self.tornado_redirected_to_list(events, expected_num_events=11):
                     fred = do_create_user(
                         email="fred@zulip.com",
                         password="password",
@@ -821,9 +814,9 @@ class QueryCountTest(ZulipTestCase):
                         acting_user=None,
                     )
 
-        self.assert_length(queries, 90)
-        self.assert_length(cache_tries, 29)
+        self.assert_length(queries, 91)
 
+        self.assert_length(cache_tries, 28)
         peer_add_events = [event for event in events if event["event"].get("op") == "peer_add"]
 
         notifications = set()
@@ -1315,7 +1308,7 @@ class UserProfileTest(ZulipTestCase):
 
         # Invalid stream ID.
         result = self.client_get(f"/json/users/{iago.id}/subscriptions/25")
-        self.assert_json_error(result, "Invalid stream id")
+        self.assert_json_error(result, "Invalid stream ID")
 
         result = orjson.loads(
             self.client_get(f"/json/users/{iago.id}/subscriptions/{stream.id}").content
@@ -1354,7 +1347,7 @@ class UserProfileTest(ZulipTestCase):
         # Unsubscribed non-admins cannot check subscription status in a private stream.
         self.login("shiva")
         result = self.client_get(f"/json/users/{iago.id}/subscriptions/{stream.id}")
-        self.assert_json_error(result, "Invalid stream id")
+        self.assert_json_error(result, "Invalid stream ID")
 
         # Subscribed non-admins can check subscription status in a private stream
         self.subscribe(self.example_user("shiva"), stream.name)
@@ -1463,19 +1456,19 @@ class ActivateTest(ZulipTestCase):
         iago = self.example_user("iago")
         desdemona = self.example_user("desdemona")
 
-        invite_expires_in_days = 2
+        invite_expires_in_minutes = 2 * 24 * 60
         do_invite_users(
             iago,
             ["new1@zulip.com", "new2@zulip.com"],
             [],
-            invite_expires_in_days=invite_expires_in_days,
+            invite_expires_in_minutes=invite_expires_in_minutes,
             invite_as=PreregistrationUser.INVITE_AS["REALM_ADMIN"],
         )
         do_invite_users(
             desdemona,
             ["new3@zulip.com", "new4@zulip.com"],
             [],
-            invite_expires_in_days=invite_expires_in_days,
+            invite_expires_in_minutes=invite_expires_in_minutes,
             invite_as=PreregistrationUser.INVITE_AS["REALM_ADMIN"],
         )
 
@@ -1483,22 +1476,22 @@ class ActivateTest(ZulipTestCase):
             iago,
             ["new5@zulip.com"],
             [],
-            invite_expires_in_days=None,
+            invite_expires_in_minutes=None,
             invite_as=PreregistrationUser.INVITE_AS["REALM_ADMIN"],
         )
         do_invite_users(
             desdemona,
             ["new6@zulip.com"],
             [],
-            invite_expires_in_days=None,
+            invite_expires_in_minutes=None,
             invite_as=PreregistrationUser.INVITE_AS["REALM_ADMIN"],
         )
 
         iago_multiuse_key = do_create_multiuse_invite_link(
-            iago, PreregistrationUser.INVITE_AS["MEMBER"], invite_expires_in_days
+            iago, PreregistrationUser.INVITE_AS["MEMBER"], invite_expires_in_minutes
         ).split("/")[-2]
         desdemona_multiuse_key = do_create_multiuse_invite_link(
-            desdemona, PreregistrationUser.INVITE_AS["MEMBER"], invite_expires_in_days
+            desdemona, PreregistrationUser.INVITE_AS["MEMBER"], invite_expires_in_minutes
         ).split("/")[-2]
 
         iago_never_expire_multiuse_key = do_create_multiuse_invite_link(
@@ -1957,8 +1950,7 @@ class BulkUsersTest(ZulipTestCase):
         def get_hamlet_avatar(client_gravatar: bool) -> Optional[str]:
             data = dict(client_gravatar=orjson.dumps(client_gravatar).decode())
             result = self.client_get("/json/users", data)
-            self.assert_json_success(result)
-            rows = result.json()["members"]
+            rows = self.assert_json_success(result)["members"]
             hamlet_data = [row for row in rows if row["user_id"] == hamlet.id][0]
             return hamlet_data["avatar_url"]
 
@@ -2010,7 +2002,7 @@ class GetProfileTest(ZulipTestCase):
         self.assertFalse(result["is_owner"])
         self.assertFalse(result["is_guest"])
         self.assertEqual(result["role"], UserProfile.ROLE_MEMBER)
-        self.assertFalse("delivery_email" in result)
+        self.assertEqual(result["delivery_email"], hamlet.delivery_email)
         self.login("iago")
         result = orjson.loads(self.client_get("/json/users/me").content)
         self.assertEqual(result["email"], iago.email)
@@ -2095,9 +2087,9 @@ class GetProfileTest(ZulipTestCase):
     def test_get_all_profiles_avatar_urls(self) -> None:
         hamlet = self.example_user("hamlet")
         result = self.api_get(hamlet, "/api/v1/users")
-        self.assert_json_success(result)
+        response_dict = self.assert_json_success(result)
 
-        (my_user,) = (user for user in result.json()["members"] if user["email"] == hamlet.email)
+        (my_user,) = (user for user in response_dict["members"] if user["email"] == hamlet.email)
 
         self.assertEqual(
             my_user["avatar_url"],
@@ -2220,7 +2212,7 @@ class DeleteUserTest(ZulipTestCase):
         )
         self.assertGreater(len(huddle_with_hamlet_recipient_ids), 0)
 
-        do_delete_user(hamlet)
+        do_delete_user(hamlet, acting_user=None)
 
         replacement_dummy_user = UserProfile.objects.get(id=hamlet_user_id, realm=realm)
 

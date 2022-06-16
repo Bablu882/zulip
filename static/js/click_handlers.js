@@ -38,8 +38,10 @@ import * as reactions from "./reactions";
 import * as recent_topics_ui from "./recent_topics_ui";
 import * as rows from "./rows";
 import * as server_events from "./server_events";
+import * as settings_display from "./settings_display";
 import * as settings_panel_menu from "./settings_panel_menu";
 import * as settings_toggle from "./settings_toggle";
+import * as spectators from "./spectators";
 import * as stream_list from "./stream_list";
 import * as stream_popover from "./stream_popover";
 import * as topic_list from "./topic_list";
@@ -214,6 +216,11 @@ export function initialize() {
         e.stopPropagation();
         popovers.hide_all();
 
+        if (page_params.is_spectator) {
+            spectators.login_to_access();
+            return;
+        }
+
         const message_id = rows.id($(this).closest(".message_row"));
         const message = message_store.get(message_id);
         message_flags.toggle_starred_and_update_server(message);
@@ -221,6 +228,12 @@ export function initialize() {
 
     $("#main_div").on("click", ".message_reaction", function (e) {
         e.stopPropagation();
+
+        if (page_params.is_spectator) {
+            spectators.login_to_access();
+            return;
+        }
+
         emoji_picker.hide_emoji_popover();
         const local_id = $(this).attr("data-reaction-id");
         const message_id = rows.get_message_id(this);
@@ -433,6 +446,11 @@ export function initialize() {
 
     $("body").on("click", ".btn-recent-filters", (e) => {
         e.stopPropagation();
+        if (page_params.is_spectator) {
+            // Filter buttons are disabled for spectator.
+            return;
+        }
+
         recent_topics_ui.change_focused_element($(e.target), "click");
         recent_topics_ui.set_filter(e.currentTarget.dataset.filter);
         recent_topics_ui.update_filters_view();
@@ -510,6 +528,12 @@ export function initialize() {
     });
 
     // SIDEBARS
+
+    $(".right-sidebar .login_button").on("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.location.href = hash_util.build_login_link();
+    });
 
     $("#userlist-toggle-button").on("click", (e) => {
         e.preventDefault();
@@ -647,6 +671,10 @@ export function initialize() {
 
     $(".organization-box").on("show.bs.modal", () => {
         popovers.hide_all();
+    });
+
+    $("body").on("click", ".reload_link", () => {
+        window.location.reload();
     });
 
     // COMPOSE
@@ -840,6 +868,12 @@ export function initialize() {
     });
 
     // GEAR MENU
+
+    $("body").on("click", ".change-language-spectator, .language_selection_widget button", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        settings_display.launch_default_language_setting_modal();
+    });
 
     $("body").on("click", "#gear-menu .dark-theme", (e) => {
         // Allow propagation to close gear menu.

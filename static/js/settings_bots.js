@@ -362,7 +362,7 @@ export function set_up() {
         $(`[name*='${CSS.escape(selected_bot)}']`).show();
     });
 
-    $("#active_bots_list").on("click", "button.delete_bot", (e) => {
+    $("#active_bots_list").on("click", "button.deactivate_bot", (e) => {
         const bot_id = Number.parseInt($(e.currentTarget).attr("data-user-id"), 10);
 
         channel.del({
@@ -450,6 +450,7 @@ export function set_up() {
                 value: bot.owner_id,
             };
             const owner_widget = new DropdownListWidget(opts);
+            owner_widget.setup();
 
             const service = bot_data.get_services(bot_id)[0];
             if (bot.bot_type.toString() === OUTGOING_WEBHOOK_BOT_TYPE) {

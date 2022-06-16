@@ -56,6 +56,7 @@
 
 ## Sending messages
 * [Open the compose box](/help/open-the-compose-box)
+* [Mastering the compose box](/help/mastering-the-compose-box)
 * [Resize the compose box](/help/resize-the-compose-box)
 * [Format messages using Markdown](/help/format-your-message-using-markdown)
 * [Mention a user or group](/help/mention-a-user-or-group)
@@ -128,6 +129,8 @@
 
 ## Organization basics
 * [Review your organization's settings](/help/review-your-organization-settings)
+* [Organization type](/help/organization-type)
+* [Communities directory](/help/communities-directory)
 * [Import from Mattermost](/help/import-from-mattermost)
 * [Import from Slack](/help/import-from-slack)
 * [Import from Gitter](/help/import-from-gitter)
@@ -149,18 +152,19 @@
 * [Deactivate or reactivate a user](/help/deactivate-or-reactivate-a-user)
 * [Add custom profile fields](/help/add-custom-profile-fields)
 * [Configure default new user settings](/help/configure-default-new-user-settings)
-* [Set default language for new users](/help/change-the-default-language-for-your-organization)
+* [Configure organization notifications language](/help/change-the-default-language-for-your-organization)
 * [User groups](/help/user-groups)
 * [Restrict visibility of email addresses](/help/restrict-visibility-of-email-addresses)
 * [Change a user's role](/help/change-a-users-role)
 * [Change a user's name](/help/change-a-users-name)
+* [Manage a user's stream subscriptions](/help/manage-user-stream-subscriptions)
 * [Restrict name and email changes](/help/restrict-name-and-email-changes)
 * [Restrict profile picture changes](/help/restrict-profile-picture-changes)
 * [Restrict permissions of new members](/help/restrict-permissions-of-new-members)
 
 ## Stream management
 * [Stream permissions](/help/stream-permissions)
-* [Web-public streams](/help/web-public-streams)
+* [Public access option](/help/public-access-option)
 * [Stream posting policy](/help/stream-sending-policy)
 * [Restrict stream creation](/help/configure-who-can-create-streams)
 * [Restrict stream invitation](/help/configure-who-can-invite-to-streams)
@@ -196,4 +200,5 @@
 * [View all bots in your organization](/help/view-all-bots-in-your-organization)
 
 ## Support
+* [View Zulip version](/help/view-zulip-version)
 * [Contact support](/help/contact-support)

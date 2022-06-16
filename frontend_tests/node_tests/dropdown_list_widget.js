@@ -49,6 +49,7 @@ run_test("basic_functions", () => {
     const {$reset_button, $widget} = setup_dropdown_zjquery_data(opts.widget_name);
 
     const widget = new DropdownListWidget(opts);
+    widget.setup();
 
     assert.equal(widget.value(), "one");
     assert.equal(updated_value, undefined); // We haven't 'updated' the widget yet.
@@ -78,7 +79,7 @@ run_test("no_default_value", () => {
         widget_name: "my_setting",
         data: ["one", "two", "three"].map((x) => ({name: x, value: x})),
         default_text: $t({defaultMessage: "not set"}),
-        render_text: (text) => `rendered: ${text}`,
+        render_text: /* istanbul ignore next */ (text) => `rendered: ${text}`,
         null_value: "null-value",
     };
 
@@ -88,6 +89,7 @@ run_test("no_default_value", () => {
     );
     setup_dropdown_zjquery_data(opts.widget_name);
     const widget = new DropdownListWidget(opts);
+    widget.setup();
     assert.equal(widget.value(), "null-value");
 });
 
@@ -112,6 +114,7 @@ run_test("basic MDLW functions", () => {
 
     const {$reset_button, $widget} = setup_multiselect_dropdown_zjquery_data(opts.widget_name);
     const widget = new MultiSelectDropdownListWidget(opts);
+    widget.setup();
 
     function set_dropdown_variables(widget, value) {
         widget.data_selected = value;
@@ -172,6 +175,7 @@ run_test("MDLW no_default_value", () => {
 
     setup_multiselect_dropdown_zjquery_data(opts.widget_name);
     const widget = new MultiSelectDropdownListWidget(opts);
+    widget.setup();
 
     assert.equal(widget.value(), "null-value");
 });
@@ -196,6 +200,7 @@ run_test("MDLW no_limit_set", () => {
 
     const {$widget} = setup_multiselect_dropdown_zjquery_data(opts.widget_name);
     const widget = new MultiSelectDropdownListWidget(opts);
+    widget.setup();
 
     set_dropdown_variables(widget, ["one", "two", "three"]);
     widget.update(widget.data_selected);

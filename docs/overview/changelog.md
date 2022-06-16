@@ -1,15 +1,78 @@
 # Version history
 
 This page the release history for the Zulip server. See also the
-[Zulip release lifecycle](release-lifecycle.md).
+[Zulip release lifecycle](../overview/release-lifecycle.md).
 
-## Zulip 5.x series
+## Zulip 6.x series
 
-### 5.0 -- unreleased
+### 6.0 -- unreleased
 
 This section is an incomplete draft of the release notes for the next
 major release, and is only updated occasionally. See the [commit
 log][commit-log] for an up-to-date list of raw changes.
+
+#### Upgrade notes for 6.0
+
+- None yet.
+
+## Zulip 5.x series
+
+### 5.2 -- 2022-05-03
+
+- Fixed a performance regression in the UI, introduced in 5.0, when
+  opening the compose box.
+- Fixed a bug which could intermittently cause URL previews to fail,
+  if Zulip was being run in Docker or in low-memory environments.
+- Fixed an issue which would cause PostgreSQL 10 and PostgreSQL 11 to
+  attempt to write each WAL log to S3, even if S3 WAL
+  backups/replication were not configured.
+- Fixed an issue which prevented the SCIM integration from
+  deactivating users.
+- Fixed a bug that resulted in an “You unsubscribed” notice
+  incorrectly appearing when new messages arrived in a topic being
+  viewed via a “near” link.
+- Fixed digest emails being incorrectly sent if a user was deactivated
+  after the digest was enqueued but before it was processed.
+- Fixed warning about `EMAIL_HOST_PASSWORD` being unset when
+  explicitly set to empty.
+- Fixed incomplete tracebacks when timeouts happen during Markdown
+  rendering.
+- Fixed some older versions of Zulip Server not being considered when
+  comparing for the likely original version of `settings.py`.
+- Stopped using the `database_password` if it is set but
+  `database_user` is not.
+- Stopped trying to fix LetsEncrypt certificate configuration if they
+  were not currently in use.
+- Sorted and prettified the output of the
+  `check-database-compatibility` tool.
+- Split the large `zerver/lib/actions.py` file into many files under
+  `zerver/actions/`. This non-functional change was backported to
+  ensure it remains easy to backport other changes.
+- Updated documentation to reflect that current mobile apps are only
+  guaranteed to be compatible with Zulip Server 3.0 and later; they
+  may also work with earlier versions, with a degraded experience.
+
+### 5.1 -- 2022-04-01
+
+- Fixed upgrade bug where preexisting animated emoji would still
+  always animate in statuses.
+- Improved check that prevents servers from accidentally downgrading,
+  to not block upgrading servers that originally installed Zulip
+  Server prior to mid-2017.
+- Fixed email address de-duplication in Slack imports.
+- Prevented an extraneous scrollbar when a notification banner was
+  present across the top.
+- Fixed installation in LXC containers, which failed due to `chrony`
+  not being runnable there.
+- Prevented a "push notifications not configured" warning from
+  appearing in the new user default settings panel even when push
+  notifications were configured.
+- Fixed a bug which, in uncommon configurations, would prevent Tornado
+  from being restarted during upgrades; users would be able to log in,
+  but would immediately be logged out.
+- Updated translations.
+
+### 5.0 -- 2022-03-29
 
 #### Highlights
 
@@ -186,6 +249,8 @@ log][commit-log] for an up-to-date list of raw changes.
   software from flagging invitations.
 - Added support for uploading animated PNGs as custom emoji.
 - Renamed "Night mode" to "Dark theme".
+- Added the mobile app's notification sound to desktop sound options,
+  as "Chime".
 - Reworked the `manage.py help` interface to hide Django commands that are
   useless or harmful to run on a production system. Also deleted
   several useless management commands.
@@ -1562,7 +1627,7 @@ Zulip installations; it has minimal changes for existing servers.
   disruption by running this migration first, before beginning the
   user-facing downtime. However, if you'd like to watch the downtime
   phase of the upgrade closely, we recommend
-  [running them first manually](https://zulip.readthedocs.io/en/1.9.0/production/expensive-migrations.html)
+  running them first manually
   as well as the usual trick of doing an apt upgrade first.
 
 #### Full feature changelog
@@ -1951,7 +2016,7 @@ running a version from before 1.7 should upgrade directly to 1.7.1.
   minimizes disruption by running these first, before beginning the
   user-facing downtime. However, if you'd like to watch the downtime
   phase of the upgrade closely, we recommend
-  [running them first manually](https://zulip.readthedocs.io/en/1.9.0/production/expensive-migrations.html)
+  running them first manually
   as well as the usual trick of doing an apt upgrade first.
 
 - We've removed support for an uncommon legacy deployment model where
@@ -2576,15 +2641,17 @@ running a version from before 1.7 should upgrade directly to 1.7.1.
 This section links to the upgrade notes from past releases, so you can
 easily read them all when upgrading across multiple releases.
 
-- [Draft upgrade notes for 5.0](#upgrade-notes-for-50)
-- [Upgrade notes for 4.0](#upgrade-notes-for-40)
-- [Upgrade notes for 3.0](#upgrade-notes-for-30)
-- [Upgrade notes for 2.1.5](#upgrade-notes-for-215)
-- [Upgrade notes for 2.1.0](#upgrade-notes-for-210)
-- [Upgrade notes for 2.0.0](#upgrade-notes-for-200)
-- [Upgrade notes for 1.9.0](#upgrade-notes-for-190)
-- [Upgrade notes for 1.8.0](#upgrade-notes-for-180)
-- [Upgrade notes for 1.7.0](#upgrade-notes-for-170)
+- [Draft upgrade notes for 6.0](#upgrade-notes-for-60)
+
+* [Upgrade notes for 5.0](#upgrade-notes-for-50)
+* [Upgrade notes for 4.0](#upgrade-notes-for-40)
+* [Upgrade notes for 3.0](#upgrade-notes-for-30)
+* [Upgrade notes for 2.1.5](#upgrade-notes-for-215)
+* [Upgrade notes for 2.1.0](#upgrade-notes-for-210)
+* [Upgrade notes for 2.0.0](#upgrade-notes-for-200)
+* [Upgrade notes for 1.9.0](#upgrade-notes-for-190)
+* [Upgrade notes for 1.8.0](#upgrade-notes-for-180)
+* [Upgrade notes for 1.7.0](#upgrade-notes-for-170)
 
 [docker-zulip]: https://github.com/zulip/docker-zulip
 [commit-log]: https://github.com/zulip/zulip/commits/main

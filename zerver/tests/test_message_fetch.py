@@ -1,11 +1,10 @@
 import datetime
 import os
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union
 from unittest import mock
 
 import orjson
 from django.db import connection
-from django.http import HttpResponse
 from django.test import override_settings
 from django.utils.timezone import now as timezone_now
 from sqlalchemy.sql import ClauseElement, Select, and_, column, select, table
@@ -13,12 +12,10 @@ from sqlalchemy.types import Integer
 
 from analytics.lib.counts import COUNT_STATS
 from analytics.models import RealmCount
-from zerver.lib.actions import (
-    do_claim_attachments,
-    do_deactivate_user,
-    do_set_realm_property,
-    do_update_message,
-)
+from zerver.actions.message_edit import do_update_message
+from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.uploads import do_claim_attachments
+from zerver.actions.users import do_deactivate_user
 from zerver.lib.avatar import avatar_url
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.mention import MentionBackend, MentionData
@@ -60,6 +57,9 @@ from zerver.views.message_fetch import (
     ok_to_include_history,
     post_process_limited_query,
 )
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
 
 
 def get_sqlalchemy_sql(query: ClauseElement) -> str:
@@ -1380,6 +1380,9 @@ class GetOldMessagesTest(ZulipTestCase):
         query_ids: Dict[str, Union[int, str]] = {}
 
         scotland_stream = get_stream("Scotland", hamlet_user.realm)
+        assert scotland_stream.recipient_id is not None
+        assert hamlet_user.recipient_id is not None
+        assert othello_user.recipient_id is not None
         query_ids["scotland_recipient"] = scotland_stream.recipient_id
         query_ids["hamlet_id"] = hamlet_user.id
         query_ids["othello_id"] = othello_user.id
@@ -1565,7 +1568,7 @@ class GetOldMessagesTest(ZulipTestCase):
         result = self.client_get("/json/messages", dict(rome_web_public_get_params))
         self.assert_json_success(result)
 
-        # Cannot access non web-public stream even with `streams:web-public` narrow.
+        # Cannot access non-web-public stream even with `streams:web-public` narrow.
         scotland_web_public_get_params: Dict[str, Union[int, str, bool]] = {
             **get_params,
             "narrow": orjson.dumps(
@@ -1583,7 +1586,7 @@ class GetOldMessagesTest(ZulipTestCase):
 
     def setup_web_public_test(self, num_web_public_message: int = 1) -> None:
         """
-        Send N+2 messages, N in a web-public stream, then one in a non web-public stream
+        Send N+2 messages, N in a web-public stream, then one in a non-web-public stream
         and then a private message.
         """
         user_profile = self.example_user("iago")
@@ -1601,7 +1604,7 @@ class GetOldMessagesTest(ZulipTestCase):
                 user_profile, web_public_stream.name, content="web-public message"
             )
         self.send_stream_message(
-            user_profile, non_web_public_stream.name, content="non web-public message"
+            user_profile, non_web_public_stream.name, content="non-web-public message"
         )
         self.send_personal_message(
             user_profile, self.example_user("hamlet"), content="private message"
@@ -1609,7 +1612,7 @@ class GetOldMessagesTest(ZulipTestCase):
         self.logout()
 
     def verify_web_public_query_result_success(
-        self, result: HttpResponse, expected_num_messages: int
+        self, result: "TestHttpResponse", expected_num_messages: int
     ) -> None:
         self.assert_json_success(result)
         messages = orjson.loads(result.content)["messages"]
@@ -2090,8 +2093,7 @@ class GetOldMessagesTest(ZulipTestCase):
         raw_params = dict(msg_ids=msg_ids, narrow=narrow)
         params = {k: orjson.dumps(v).decode() for k, v in raw_params.items()}
         result = self.client_get("/json/messages/matches_narrow", params)
-        self.assert_json_success(result)
-        messages = result.json()["messages"]
+        messages = self.assert_json_success(result)["messages"]
         self.assert_length(list(messages.keys()), 1)
         message = messages[str(good_id)]
         self.assertEqual(
@@ -2485,8 +2487,7 @@ class GetOldMessagesTest(ZulipTestCase):
         raw_params = dict(msg_ids=msg_ids, narrow=narrow)
         params = {k: orjson.dumps(v).decode() for k, v in raw_params.items()}
         result = self.client_get("/json/messages/matches_narrow", params)
-        self.assert_json_success(result)
-        messages = result.json()["messages"]
+        messages = self.assert_json_success(result)["messages"]
         self.assert_length(list(messages.keys()), 1)
         message = messages[str(good_id)]
         self.assertIn("a href=", message["match_content"])
@@ -3240,6 +3241,7 @@ class GetOldMessagesTest(ZulipTestCase):
         self.assertNotIn("AND message_id <=", sql)
         self.assertNotIn("AND message_id >=", sql)
 
+        request = HostRequestMock(query_params, user_profile)
         first_visible_message_id = 5
         with first_visible_id_as(first_visible_message_id):
             with queries_captured() as all_queries:
@@ -3860,7 +3862,9 @@ class MessageHasKeywordsTest(ZulipTestCase):
         msg_id = self.send_stream_message(hamlet, "Denmark", body, "test")
         msg = Message.objects.get(id=msg_id)
 
-        with mock.patch("zerver.lib.actions.do_claim_attachments", wraps=do_claim_attachments) as m:
+        with mock.patch(
+            "zerver.actions.uploads.do_claim_attachments", wraps=do_claim_attachments
+        ) as m:
             self.update_message(
                 msg, f"[link](http://{hamlet.realm.host}/user_uploads/{dummy_path_ids[0]})"
             )

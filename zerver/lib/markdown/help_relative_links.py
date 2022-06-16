@@ -1,5 +1,5 @@
 import re
-from typing import Any, List, Match, Optional
+from typing import Any, List, Match
 
 from markdown import Markdown
 from markdown.extensions import Extension
@@ -27,6 +27,7 @@ gear_info = {
     "plans": ["Plans and pricing", "/plans"],
     "billing": ["Billing", "/billing"],
     "invite": ["Invite users", "/#invite"],
+    "about-zulip": ["About Zulip", "/#about-zulip"],
 }
 
 gear_instructions = """
@@ -81,7 +82,7 @@ class RelativeLinksHelpExtension(Extension):
         )
 
 
-relative_help_links: Optional[bool] = None
+relative_help_links: bool = False
 
 
 def set_relative_help_links(value: bool) -> None:

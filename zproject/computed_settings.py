@@ -38,6 +38,8 @@ from .configured_settings import (
     EXTERNAL_URI_SCHEME,
     EXTRA_INSTALLED_APPS,
     GOOGLE_OAUTH2_CLIENT_ID,
+    HOME_NOT_LOGGED_IN,
+    INVITATION_LINK_VALIDITY_DAYS,
     IS_DEV_DROPLET,
     LOCAL_UPLOADS_DIR,
     MEMCACHED_LOCATION,
@@ -152,8 +154,6 @@ USE_TZ = True
 
 # this directory will be used to store logs for development environment
 DEVELOPMENT_LOG_DIRECTORY = os.path.join(DEPLOY_ROOT, "var", "log")
-# Make redirects work properly behind a reverse proxy
-USE_X_FORWARDED_HOST = True
 
 # Extend ALLOWED_HOSTS with localhost (needed to RPC to Tornado),
 ALLOWED_HOSTS += ["127.0.0.1", "localhost",'webnyxa.dev']
@@ -234,7 +234,6 @@ if not TORNADO_PORTS:
 TORNADO_PROCESSES = len(TORNADO_PORTS)
 
 RUNNING_INSIDE_TORNADO = False
-AUTORELOAD = DEBUG
 
 SILENCED_SYSTEM_CHECKS = [
     # auth.W004 checks that the UserProfile field named by USERNAME_FIELD has
@@ -316,7 +315,7 @@ elif REMOTE_POSTGRES_HOST != "":
         DATABASES["default"]["OPTIONS"]["sslmode"] = REMOTE_POSTGRES_SSLMODE
     else:
         DATABASES["default"]["OPTIONS"]["sslmode"] = "verify-full"
-elif get_config("postgresql", "database_user") != "zulip":
+elif get_config("postgresql", "database_user", "zulip") != "zulip":
     if get_secret("postgres_password") is not None:
         DATABASES["default"].update(
             PASSWORD=get_secret("postgres_password"),
@@ -343,7 +342,7 @@ MEMCACHED_PASSWORD = get_secret("memcached_password")
 
 CACHES = {
     "default": {
-        "BACKEND": "django_bmemcached.memcached.BMemcached",
+        "BACKEND": "zerver.lib.singleton_bmemcached.SingletonBMemcached",
         "LOCATION": MEMCACHED_LOCATION,
         "OPTIONS": {
             "socket_timeout": 3600,
@@ -364,9 +363,6 @@ CACHES = {
             "CULL_FREQUENCY": 10,
         },
     },
-    "in-memory": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-    },
 }
 
 ########################################################################
@@ -384,7 +380,7 @@ RATE_LIMITING_RULES = {
         (60, 1000),
     ],
     "authenticate_by_username": [
-        (1800, 5),  # 5 login attempts within 30 minutes
+        (1800, 5),  # 5 failed login attempts within 30 minutes
     ],
     "email_change_by_user": [
         (3600, 2),  # 2 per hour
@@ -1046,17 +1042,13 @@ ONLY_LDAP = AUTHENTICATION_BACKENDS == ("zproject.backends.ZulipLDAPAuthBackend"
 USING_APACHE_SSO = "zproject.backends.ZulipRemoteUserBackend" in AUTHENTICATION_BACKENDS
 ONLY_SSO = AUTHENTICATION_BACKENDS == ("zproject.backends.ZulipRemoteUserBackend",)
 
-if ONLY_SSO:
-    HOME_NOT_LOGGED_IN = "/accounts/login/sso/"
-else:
-    HOME_NOT_LOGGED_IN = "/login/"
+if HOME_NOT_LOGGED_IN is None:
+    if ONLY_SSO:
+        HOME_NOT_LOGGED_IN = "/accounts/login/sso/"
+    else:
+        HOME_NOT_LOGGED_IN = "/login/"
 
 AUTHENTICATION_BACKENDS += ("zproject.backends.ZulipDummyBackend",)
-
-# Redirect to /devlogin/ by default in dev mode
-if DEVELOPMENT:
-    HOME_NOT_LOGGED_IN = "/devlogin/"
-    LOGIN_URL = "/devlogin/"
 
 POPULATE_PROFILE_VIA_LDAP = bool(AUTH_LDAP_SERVER_URI)
 
@@ -1203,6 +1195,9 @@ AUTH_LDAP_BIND_PASSWORD = get_secret("auth_ldap_bind_password", "")
 ########################################################################
 # MISC SETTINGS
 ########################################################################
+
+# Convert INVITATION_LINK_VALIDITY_DAYS into minutes.
+INVITATION_LINK_VALIDITY_MINUTES = 24 * 60 * INVITATION_LINK_VALIDITY_DAYS
 
 if PRODUCTION:
     # Filter out user data

@@ -8,12 +8,10 @@ from django.http import HttpRequest, HttpResponse
 from django.utils.timezone import now as timezone_now
 
 from version import API_FEATURE_LEVEL, ZULIP_MERGE_BASE, ZULIP_VERSION
-from zerver.lib.actions import (
-    check_send_message,
-    do_change_user_role,
-    do_set_realm_property,
-    do_update_user_presence,
-)
+from zerver.actions.message_send import check_send_message
+from zerver.actions.presence import do_update_user_presence
+from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.users import do_change_user_role
 from zerver.lib.event_schema import check_restart_event
 from zerver.lib.events import fetch_initial_state_data
 from zerver.lib.exceptions import AccessDeniedError
@@ -81,8 +79,7 @@ class EventsEndpointTest(ZulipTestCase):
                 user, "/json/register", dict(event_types=orjson.dumps([event_type]).decode())
             )
 
-        self.assert_json_success(result)
-        result_dict = result.json()
+        result_dict = self.assert_json_success(result)
         self.assertEqual(result_dict["last_event_id"], -1)
         self.assertEqual(result_dict["queue_id"], "15:11")
 
@@ -95,8 +92,7 @@ class EventsEndpointTest(ZulipTestCase):
                 user, "/json/register", dict(event_types=orjson.dumps([event_type]).decode())
             )
 
-        self.assert_json_success(result)
-        result_dict = result.json()
+        result_dict = self.assert_json_success(result)
         self.assertEqual(result_dict["last_event_id"], 6)
         self.assertEqual(result_dict["queue_id"], "15:12")
 
@@ -114,8 +110,7 @@ class EventsEndpointTest(ZulipTestCase):
                     fetch_event_types=orjson.dumps(["message"]).decode(),
                 ),
             )
-        self.assert_json_success(result)
-        result_dict = result.json()
+        result_dict = self.assert_json_success(result)
         self.assertEqual(result_dict["last_event_id"], 6)
         # Check that the message event types data is in there
         self.assertIn("max_message_id", result_dict)
@@ -134,8 +129,7 @@ class EventsEndpointTest(ZulipTestCase):
                     event_types=orjson.dumps(["message"]).decode(),
                 ),
             )
-        self.assert_json_success(result)
-        result_dict = result.json()
+        result_dict = self.assert_json_success(result)
         self.assertEqual(result_dict["last_event_id"], 6)
         # Check that we didn't fetch the messages data
         self.assertNotIn("max_message_id", result_dict)
@@ -144,6 +138,22 @@ class EventsEndpointTest(ZulipTestCase):
         self.assertIn("realm_emoji", result_dict)
         self.assertEqual(result_dict["realm_emoji"], [])
         self.assertEqual(result_dict["queue_id"], "15:13")
+
+    def test_events_register_spectators(self) -> None:
+        # Verify that POST /register works for spectators, but not for
+        # normal users.
+        with self.settings(WEB_PUBLIC_STREAMS_ENABLED=False):
+            result = self.client_post("/json/register", dict())
+            self.assert_json_error(
+                result,
+                "Not logged in: API authentication or user session required",
+                status_code=401,
+            )
+
+        result = self.client_post("/json/register", dict())
+        result_dict = self.assert_json_success(result)
+        self.assertEqual(result_dict["queue_id"], None)
+        self.assertEqual(result_dict["realm_uri"], "http://zulip.testserver")
 
     def test_events_register_endpoint_all_public_streams_access(self) -> None:
         guest_user = self.example_user("polonius")
@@ -461,7 +471,10 @@ class FetchInitialStateDataTest(ZulipTestCase):
         result = fetch_initial_state_data(user_profile)
 
         for key, value in result["raw_users"].items():
-            self.assertNotIn("delivery_email", value)
+            if key == user_profile.id:
+                self.assertEqual(value["delivery_email"], user_profile.delivery_email)
+            else:
+                self.assertNotIn("delivery_email", value)
 
         do_set_realm_property(
             user_profile.realm,
@@ -472,7 +485,10 @@ class FetchInitialStateDataTest(ZulipTestCase):
         result = fetch_initial_state_data(user_profile)
 
         for key, value in result["raw_users"].items():
-            self.assertNotIn("delivery_email", value)
+            if key == user_profile.id:
+                self.assertEqual(value["delivery_email"], user_profile.delivery_email)
+            else:
+                self.assertNotIn("delivery_email", value)
 
     def test_delivery_email_presence_for_admins(self) -> None:
         user_profile = self.example_user("iago")
@@ -485,8 +501,12 @@ class FetchInitialStateDataTest(ZulipTestCase):
             acting_user=None,
         )
         result = fetch_initial_state_data(user_profile)
+
         for key, value in result["raw_users"].items():
-            self.assertNotIn("delivery_email", value)
+            if key == user_profile.id:
+                self.assertEqual(value["delivery_email"], user_profile.delivery_email)
+            else:
+                self.assertNotIn("delivery_email", value)
 
         do_set_realm_property(
             user_profile.realm,
@@ -1006,7 +1026,7 @@ class FetchQueriesTest(ZulipTestCase):
             with mock.patch("zerver.lib.events.always_want") as want_mock:
                 fetch_initial_state_data(user)
 
-        self.assert_length(queries, 35)
+        self.assert_length(queries, 36)
 
         expected_counts = dict(
             alert_words=1,
@@ -1029,7 +1049,7 @@ class FetchQueriesTest(ZulipTestCase):
             realm_linkifiers=1,
             realm_playgrounds=1,
             realm_user=3,
-            realm_user_groups=2,
+            realm_user_groups=3,
             realm_user_settings_defaults=1,
             recent_private_conversations=1,
             starred_messages=1,

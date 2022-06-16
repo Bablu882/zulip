@@ -25,6 +25,14 @@ from confirmation.models import (
     render_confirmation_key_error,
     validate_key,
 )
+from zerver.actions.create_realm import do_create_realm
+from zerver.actions.create_user import do_activate_mirror_dummy_user, do_create_user
+from zerver.actions.default_streams import lookup_default_stream_groups
+from zerver.actions.user_settings import (
+    do_change_full_name,
+    do_change_password,
+    do_change_user_setting,
+)
 from zerver.context_processors import get_realm_from_request, login_context
 from zerver.decorator import do_login, rate_limit_request_by_ip, require_post
 from zerver.forms import (
@@ -34,17 +42,9 @@ from zerver.forms import (
     RealmRedirectForm,
     RegistrationForm,
 )
-from zerver.lib.actions import (
-    do_activate_mirror_dummy_user,
-    do_change_full_name,
-    do_change_password,
-    do_change_user_setting,
-    do_create_realm,
-    do_create_user,
-    lookup_default_stream_groups,
-)
 from zerver.lib.email_validation import email_allowed_for_realm, validate_email_not_already_in_realm
 from zerver.lib.exceptions import RateLimited
+from zerver.lib.i18n import get_default_language_for_new_user
 from zerver.lib.pysa import mark_sanitized
 from zerver.lib.request import REQ, has_request_variables
 from zerver.lib.send_email import EmailNotDeliveredException, FromAddress, send_email
@@ -383,7 +383,7 @@ def accounts_register(
             # prereg_user.realm_creation carries the information about whether
             # we're in realm creation mode, and the ldap flow will handle
             # that and create the user with the appropriate parameters.
-            user_profile = authenticate(
+            user = authenticate(
                 request=request,
                 username=email,
                 password=password,
@@ -391,7 +391,7 @@ def accounts_register(
                 prereg_user=prereg_user,
                 return_data=return_data,
             )
-            if user_profile is None:
+            if user is None:
                 can_use_different_backend = email_auth_enabled(realm) or (
                     len(get_external_method_dicts(realm)) > 0
                 )
@@ -419,13 +419,14 @@ def accounts_register(
                     query = urlencode({"email": email})
                     redirect_url = append_url_query_string(view_url, query)
                     return HttpResponseRedirect(redirect_url)
-            elif not realm_creation:
-                # Since we'll have created a user, we now just log them in.
-                return login_and_go_to_home(request, user_profile)
             else:
+                assert isinstance(user, UserProfile)
+                user_profile = user
+                if not realm_creation:
+                    # Since we'll have created a user, we now just log them in.
+                    return login_and_go_to_home(request, user_profile)
                 # With realm_creation=True, we're going to return further down,
                 # after finishing up the creation process.
-                pass
 
         if existing_user_profile is not None and existing_user_profile.is_mirror_dummy:
             user_profile = existing_user_profile
@@ -433,6 +434,12 @@ def accounts_register(
             do_change_password(user_profile, password)
             do_change_full_name(user_profile, full_name, user_profile)
             do_change_user_setting(user_profile, "timezone", timezone, acting_user=user_profile)
+            do_change_user_setting(
+                user_profile,
+                "default_language",
+                get_default_language_for_new_user(request, realm),
+                acting_user=None,
+            )
             # TODO: When we clean up the `do_activate_mirror_dummy_user` code path,
             # make it respect invited_as_admin / is_realm_admin.
 
@@ -446,6 +453,7 @@ def accounts_register(
                 role=role,
                 tos_version=settings.TERMS_OF_SERVICE_VERSION,
                 timezone=timezone,
+                default_language=get_default_language_for_new_user(request, realm),
                 default_stream_groups=default_stream_groups,
                 source_profile=source_profile,
                 realm_creation=realm_creation,
@@ -478,6 +486,7 @@ def accounts_register(
             )
             return redirect("/")
 
+        assert isinstance(auth_result, UserProfile)
         return login_and_go_to_home(request, auth_result)
 
     return render(

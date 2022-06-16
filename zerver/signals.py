@@ -74,7 +74,7 @@ def email_on_new_login(sender: Any, user: UserProfile, request: Any, **kwargs: A
         if (timezone_now() - user.date_joined).total_seconds() <= JUST_CREATED_THRESHOLD:
             return
 
-        user_agent = request.META.get("HTTP_USER_AGENT", "").lower()
+        user_agent = request.headers.get("User-Agent", "").lower()
 
         context = common_context(user)
         context["user_email"] = user.delivery_email
@@ -107,7 +107,7 @@ def clear_zoom_token_on_logout(
     sender: object, *, user: Optional[UserProfile], **kwargs: object
 ) -> None:
     # Loaded lazily so django.setup() succeeds before static asset generation
-    from zerver.lib.actions import do_set_zoom_token
+    from zerver.actions.video_calls import do_set_zoom_token
 
     if user is not None and user.zoom_token is not None:
         do_set_zoom_token(user, None)

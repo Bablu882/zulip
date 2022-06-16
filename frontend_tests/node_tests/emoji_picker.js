@@ -7,7 +7,7 @@ const _ = require("lodash");
 const {zrequire} = require("../zjsunit/namespace");
 const {run_test} = require("../zjsunit/test");
 
-const emoji = zrequire("../shared/js/emoji");
+const emoji = zrequire("emoji");
 const emoji_picker = zrequire("emoji_picker");
 
 const emoji_codes = zrequire("../generated/emoji/emoji_codes.json");
@@ -58,5 +58,35 @@ run_test("initialize", () => {
     assert.equal(
         emoji.emojis_by_name.size,
         total_emoji_in_categories - popular_emoji_count + zulip_emoji_count,
+    );
+});
+
+run_test("is_emoji_present_in_text", () => {
+    const thermometer_emoji = {
+        name: "thermometer",
+        emoji_code: "1f321",
+        reaction_type: "unicode_emoji",
+    };
+    const headphones_emoji = {
+        name: "headphones",
+        emoji_code: "1f3a7",
+        reaction_type: "unicode_emoji",
+    };
+    assert.equal(emoji_picker.is_emoji_present_in_text("🌡", thermometer_emoji), true);
+    assert.equal(
+        emoji_picker.is_emoji_present_in_text("no emojis at all", thermometer_emoji),
+        false,
+    );
+    assert.equal(emoji_picker.is_emoji_present_in_text("😎", thermometer_emoji), false);
+    assert.equal(emoji_picker.is_emoji_present_in_text("😎🌡🎧", thermometer_emoji), true);
+    assert.equal(emoji_picker.is_emoji_present_in_text("😎🎧", thermometer_emoji), false);
+    assert.equal(emoji_picker.is_emoji_present_in_text("😎🌡🎧", headphones_emoji), true);
+    assert.equal(
+        emoji_picker.is_emoji_present_in_text("emojis with text 😎🌡🎧", thermometer_emoji),
+        true,
+    );
+    assert.equal(
+        emoji_picker.is_emoji_present_in_text("emojis with text no space😎🌡🎧", headphones_emoji),
+        true,
     );
 });

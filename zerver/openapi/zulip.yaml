@@ -469,7 +469,7 @@ paths:
                                     - type: object
                                       additionalProperties: false
                                       description: |
-                                        When the role of a user changes.
+                                        When the [role](/help/roles-and-permissions) of a user changes.
                                       properties:
                                         user_id:
                                           type: integer
@@ -478,7 +478,7 @@ paths:
                                         role:
                                           type: integer
                                           description: |
-                                            The new role of the user in integer.
+                                            The new [role](/api/roles-and-permissions) of the user.
                                           enum:
                                             - 100
                                             - 200
@@ -538,8 +538,10 @@ paths:
                                                 The ID of the custom profile field which user updated.
                                             value:
                                               type: string
+                                              nullable: true
                                               description: |
-                                                User's personal value for this custom profile field.
+                                                User's personal value for this custom profile field,
+                                                or `null` if unset.
                                             rendered_value:
                                               type: string
                                               description: |
@@ -566,7 +568,10 @@ paths:
                                         new_email:
                                           type: string
                                           description: |
-                                            The new email of the user.
+                                            The new value of `email` for the user. The client
+                                            should update any data structures associated
+                                            with this user to use this new value as the
+                                            user's Zulip display email address.
                               additionalProperties: false
                               example:
                                 {
@@ -1232,18 +1237,14 @@ paths:
                                   "name": "test_stream",
                                   "id": 0,
                                 }
-                            - description: |
+                            - type: object
+                              description: |
                                 Event sent when a reaction is added to a message.
                                 Sent to all users who were recipients of the message.
                               allOf:
                                 - $ref: "#/components/schemas/EmojiReactionBase"
                                 - additionalProperties: false
                                   properties:
-                                    emoji_code: {}
-                                    emoji_name: {}
-                                    reaction_type: {}
-                                    user_id: {}
-                                    user: {}
                                     id:
                                       $ref: "#/components/schemas/EventIdSchema"
                                     type:
@@ -1260,6 +1261,11 @@ paths:
                                       description: |
                                         The ID of the message to which a reaction was
                                         added.
+                                    emoji_code: {}
+                                    emoji_name: {}
+                                    reaction_type: {}
+                                    user_id: {}
+                                    user: {}
                                   example:
                                     {
                                       "type": "reaction",
@@ -1277,18 +1283,14 @@ paths:
                                       "reaction_type": "unicode_emoji",
                                       "id": 0,
                                     }
-                            - description: |
+                            - type: object
+                              description: |
                                 Event sent when a reaction is removed from a message.
                                 Sent to all users who were recipients of the message.
                               allOf:
                                 - $ref: "#/components/schemas/EmojiReactionBase"
                                 - additionalProperties: false
                                   properties:
-                                    emoji_code: {}
-                                    emoji_name: {}
-                                    reaction_type: {}
-                                    user_id: {}
-                                    user: {}
                                     id:
                                       $ref: "#/components/schemas/EventIdSchema"
                                     type:
@@ -1305,6 +1307,11 @@ paths:
                                       description: |
                                         The ID of the message from which the reaction was
                                         removed.
+                                    emoji_code: {}
+                                    emoji_name: {}
+                                    reaction_type: {}
+                                    user_id: {}
+                                    user: {}
                                   example:
                                     {
                                       "type": "reaction",
@@ -1511,36 +1518,39 @@ paths:
                                   type: string
                                   description: |
                                     The text content of the status message.
+
+                                    This will be `""` for users who set a status without selecting
+                                    or writing a message.
                                 emoji_name:
                                   type: string
                                   description: |
-                                    The [emoji name](/api/add-reaction#parameters) for the emoji
-                                    the user selected for their new status.
+                                    The [emoji name](/api/update-status#parameter-emoji_name) for
+                                    the emoji the user selected for their new status.
 
-                                    This will be "" for users who set a status without selecting
+                                    This will be `""` for users who set a status without selecting
                                     an emoji.
 
-                                    **Changes**; New in Zulip 5.0 (feature level 86).
+                                    **Changes**: New in Zulip 5.0 (feature level 86).
                                 emoji_code:
                                   type: string
                                   description: |
-                                    The [emoji code](/api/add-reaction#parameters) for the emoji
-                                    the user selected for their new status.
+                                    The [emoji code](/api/update-status#parameter-emoji_code) for
+                                    the emoji the user selected for their new status.
 
-                                    This will be "" for users who set a status without selecting
+                                    This will be `""` for users who set a status without selecting
                                     an emoji.
 
-                                    **Changes**; New in Zulip 5.0 (feature level 86).
+                                    **Changes**: New in Zulip 5.0 (feature level 86).
                                 reaction_type:
                                   type: string
                                   description: |
-                                    The [emoji type](/api/add-reaction#parameters) for the emoji
-                                    the user selected for their new status.
+                                    The [emoji type](/api/update-status#parameter-reaction_type) for
+                                    the emoji the user selected for their new status.
 
-                                    This will be "" for users who set a status without selecting
+                                    This will be `""` for users who set a status without selecting
                                     an emoji.
 
-                                    **Changes**; New in Zulip 5.0 (feature level 86).
+                                    **Changes**: New in Zulip 5.0 (feature level 86).
                                 user_id:
                                   type: integer
                                   description: |
@@ -2828,6 +2838,92 @@ paths:
                             - type: object
                               additionalProperties: false
                               description: |
+                                Event sent to all users when subgroups have been added to
+                                a user group.
+
+                                **Changes**: New in Zulip 6.0 (feature level 127).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - user_group
+                                op:
+                                  type: string
+                                  enum:
+                                    - add_subgroups
+                                group_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the user group whose details have changed.
+                                direct_subgroup_ids:
+                                  type: array
+                                  items:
+                                    type: integer
+                                  description: |
+                                    Array containing the IDs of the subgroups that have been added
+                                    to the user group.
+
+                                    **Changes**: New in Zulip 6.0 (feature level 131).
+                                    Previously, this was called `subgroup_ids`, but
+                                    clients can ignore older events as this feature level
+                                    predates subgroups being fully implemented.
+                              example:
+                                {
+                                  "type": "user_group",
+                                  "op": "add_subgroups",
+                                  "group_id": 2,
+                                  "direct_subgroup_ids": [10],
+                                  "id": 0,
+                                }
+                            - type: object
+                              additionalProperties: false
+                              description: |
+                                Event sent to all users when subgroups have been removed from
+                                a user group.
+
+                                **Changes**: New in Zulip 6.0 (feature level 127).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - user_group
+                                op:
+                                  type: string
+                                  enum:
+                                    - remove_subgroups
+                                group_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the user group whose details have changed.
+                                direct_subgroup_ids:
+                                  type: array
+                                  items:
+                                    type: integer
+                                  description: |
+                                    Array containing the IDs of the subgroups that have been
+                                    removed from the user group.
+
+                                    **Changes**: New in Zulip 6.0 (feature level 131).
+                                    Previously, this was called `subgroup_ids`, but
+                                    clients can ignore older events as this feature level
+                                    predates subgroups being fully implemented.
+                              example:
+                                {
+                                  "type": "user_group",
+                                  "op": "remove_subgroups",
+                                  "group_id": 2,
+                                  "direct_subgroup_ids": [10],
+                                  "id": 0,
+                                }
+                            - type: object
+                              additionalProperties: false
+                              description: |
                                 Event sent to all users when a user group has been deleted.
                               properties:
                                 id:
@@ -3573,7 +3669,8 @@ paths:
                                     add_custom_emoji_policy:
                                       type: integer
                                       description: |
-                                        The policy for which users can add custom emoji in this organization.
+                                        The [policy](/api/roles-and-permissions#permission-levels)
+                                        for which users can add custom emoji in this organization.
                                     allow_edit_history:
                                       type: boolean
                                       description: |
@@ -3598,7 +3695,8 @@ paths:
                                     bot_creation_policy:
                                       type: integer
                                       description: |
-                                        The policy for which users can create bot users in this organization.
+                                        The [policy](/api/roles-and-permissions#permission-levels)
+                                        for which users can create bot users in this organization.
                                     community_topic_editing_limit_seconds:
                                       type: integer
                                       description: |
@@ -3611,19 +3709,26 @@ paths:
                                     create_public_stream_policy:
                                       type: integer
                                       description: |
-                                        The policy for which users can
-                                        create public streams in this organization.
+                                        The [policy](/api/roles-and-permissions#permission-levels)
+                                        for which users can create public streams in this organization.
 
                                         **Changes**: Before Zulip 5.0 (feature level 102), permission to
                                         create streams was controlled by the `create_stream_policy` setting.
                                     create_private_stream_policy:
                                       type: integer
                                       description: |
-                                        The policy for which users can
-                                        create private streams in this organization.
+                                        The [policy](/api/roles-and-permissions#permission-levels)
+                                        for which users can create private streams in this organization.
 
                                         **Changes**: Before Zulip 5.0 (feature level 102), permission to
                                         create streams was controlled by the `create_stream_policy` setting.
+                                    create_web_public_stream_policy:
+                                      type: integer
+                                      description: |
+                                        The [policy](/api/roles-and-permissions#permission-levels)
+                                        for which users can create web public streams in this organization.
+
+                                        **Changes**: New in Zulip 5.0 (feature level 103).
                                     default_code_block_language:
                                       type: string
                                       nullable: true
@@ -3655,27 +3760,32 @@ paths:
                                     edit_topic_policy:
                                       type: integer
                                       description: |
-                                        The policy for which users can edit topics of any message.
+                                        The [policy][permission-level] for which users can edit topics of any message.
 
                                         - 1 = members only
                                         - 2 = admins only
-                                        - 3 = full members only
+                                        - 3 = [full members][calc-full-member] only
                                         - 4 = moderators only
                                         - 5 = everyone
 
                                         **Changes**: New in Zulip 5.0 (feature level 75), replacing the
                                         previous `allow_community_topic_editing` boolean.
+
+                                        [permission-level]: /api/roles-and-permissions#permission-levels
+                                        [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                                     email_address_visibility:
                                       type: integer
                                       description: |
-                                        The policy for which users in this organization can see the
-                                        real email addresses of other users.
+                                        The [policy][permission-level] for which users in this organization can see
+                                        the real email addresses of other users.
 
                                         - 1 = everyone
                                         - 2 = members only
                                         - 3 = administrators only
                                         - 4 = nobody (though note that administrators can change this setting).
                                         - 5 = moderators only
+
+                                        [permission-level]: /api/roles-and-permissions#permission-levels
                                     email_changes_disabled:
                                       type: boolean
                                       description: |
@@ -3737,16 +3847,16 @@ paths:
                                     invite_to_realm_policy:
                                       type: integer
                                       description: |
-                                        The policy for which users can invite other users
-                                        to join the organization.
+                                        The [policy](/api/roles-and-permissions#permission-levels)
+                                        for which users can invite other users to join the organization.
 
                                         **Changes**: New in Zulip 4.0 (feature level 50) replacing the
                                         previous `invite_by_admins_only` boolean.
                                     invite_to_stream_policy:
                                       type: integer
                                       description: |
-                                        The policy for which users can add other users to streams in this
-                                        organization.
+                                        The [policy](/api/roles-and-permissions#permission-levels)
+                                        for which users can add other users to streams in this organization.
                                     logo_source:
                                       type: string
                                       description: |
@@ -3794,14 +3904,18 @@ paths:
                                     move_messages_between_streams_policy:
                                       type: integer
                                       description: |
-                                        The policy for which users can move messages from one stream to another.
+                                        The [policy][permission-level] for which users can move messages from
+                                        one stream to another.
 
                                         - 1 = Members only
                                         - 2 = Administrators only
-                                        - 3 = Full members only
+                                        - 3 = [Full members][calc-full-member] only
                                         - 4 = Moderators only
 
                                         **Changes**: New in Zulip 4.0 (feature level 56)
+
+                                        [permission-level]: /api/roles-and-permissions#permission-levels
+                                        [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                                     name:
                                       type: string
                                       description: |
@@ -3837,6 +3951,27 @@ paths:
 
                                         Since these notifications are sent by the server, this field is
                                         primarily relevant to clients containing UI for changing it.
+                                    org_type:
+                                      type: integer
+                                      description: |
+                                        The [organization type](/help/organization-type)
+                                        for the realm.
+
+                                        - 0 = Unspecified
+                                        - 10 = Business
+                                        - 20 = Open-source project
+                                        - 30 = Education (non-profit)
+                                        - 35 = Education (for-profit)
+                                        - 40 = Research
+                                        - 50 = Event or conference
+                                        - 60 = Non-profit (registered)
+                                        - 70 = Government
+                                        - 80 = Political group
+                                        - 90 = Community
+                                        - 100 = Personal
+                                        - 1000 = Other
+
+                                        **Changes**: New in Zulip 6.0 (feature level 128).
                                     plan_type:
                                       type: integer
                                       description: |
@@ -3854,7 +3989,8 @@ paths:
                                     private_message_policy:
                                       type: integer
                                       description: |
-                                        Policy for [who can send private messages](/help/restrict-private-messages)
+                                        [Policy](/api/roles-and-permissions#permission-levels)
+                                        for [who can send private messages](/help/restrict-private-messages)
                                         in this organization.
 
                                         - 1 = Everyone
@@ -3876,15 +4012,17 @@ paths:
                                     user_group_edit_policy:
                                       type: integer
                                       description: |
-                                        The organization's policy for [who can manage user groups
-                                        ][user-group-permissions].
+                                        The organization's [policy][permission-level] for
+                                        [who can manage user groups][user-group-permissions].
 
                                         - 1 = All members can create and edit user groups
                                         - 2 = Only organization administrators can create and edit user groups
-                                        - 3 = Only full members can create and edit user groups
+                                        - 3 = Only [full members][calc-full-member] can create and edit user groups
                                         - 4 = Only organization administrators and moderators can create and edit user groups
 
                                         [user-group-permissions]: /help/user-groups#configure-who-can-create-and-manage-user-groups
+                                        [permission-level]: /api/roles-and-permissions#permission-levels
+                                        [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                                     video_chat_provider:
                                       type: integer
                                       description: |
@@ -3893,16 +4031,26 @@ paths:
                                       type: integer
                                       description: |
                                         Members whose accounts have been created at least this many days ago
-                                        will be treated as [full members](/help/restrict-permissions-of-new-members)
+                                        will be treated as [full members][calc-full-member]
                                         for the purpose of settings that restrict access to new members.
+
+                                        [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
+                                    want_advertise_in_communities_directory:
+                                      type: boolean
+                                      description: |
+                                        Whether the organization has given permission to be advertised in the
+                                        Zulip [communities directory](/help/communities-directory).
+
+                                        **Changes**: New in Zulip 6.0 (feature level 129).
                                     wildcard_mention_policy:
                                       type: integer
                                       description: |
-                                        The policy for who can use wildcard mentions in large streams.
+                                        The [policy][permission-level] for who can use wildcard mentions in
+                                        large streams.
 
                                         - 1 => Any user can use wildcard mentions in large streams.
                                         - 2 => Only members can use wildcard mentions in large streams.
-                                        - 3 => Only full members can use wildcard mentions in large streams.
+                                        - 3 => Only [full members][calc-full-member] can use wildcard mentions in large streams.
                                         - 4 => Only stream and organization administrators can use wildcard mentions in large streams.
                                         - 5 => Only organization administrators can use wildcard mentions in large streams.
                                         - 6 => Nobody can use wildcard mentions in large streams.
@@ -3913,6 +4061,9 @@ paths:
 
                                         **Changes**: New in Zulip 4.0 (feature level 33). Moderators option added in
                                         Zulip 4.0 (feature level 62).
+
+                                        [permission-level]: /api/roles-and-permissions#permission-levels
+                                        [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                                   additionalProperties: false
                               example:
                                 {
@@ -4160,13 +4311,7 @@ paths:
         - $ref: "#/components/parameters/QueueId"
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -4239,13 +4384,7 @@ paths:
         `POST {{ api_url }}/v1/mark_all_as_read`
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
   /mark_stream_as_read:
     post:
       operationId: mark-stream-as-read
@@ -4264,13 +4403,7 @@ paths:
           required: true
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
   /mark_topic_as_read:
     post:
       operationId: mark-topic-as-read
@@ -4297,13 +4430,7 @@ paths:
           required: true
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
   /attachments:
     get:
       operationId: get-attachments
@@ -4596,13 +4723,7 @@ paths:
           required: True
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
         "404":
           description: Not Found.
           content:
@@ -4633,13 +4754,7 @@ paths:
           example: 1
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
         "404":
           description: Not Found.
           content:
@@ -4744,6 +4859,10 @@ paths:
           description: |
             The narrow where you want to fetch the messages from. See how to
             [construct a narrow](/api/construct-narrow).
+
+            **Changes**: In Zulip 2.1, added support for using user/stream IDs
+            when constructing narrows for a message's sender, its stream and/or
+            its recipient(s).
           content:
             application/json:
               schema:
@@ -5445,7 +5564,6 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/SimpleSuccess"
-
         "400":
           description: Bad request.
           content:
@@ -5863,13 +5981,7 @@ paths:
           example: 43
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -5913,13 +6025,7 @@ paths:
         - $ref: "#/components/parameters/MessageId"
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -6268,14 +6374,7 @@ paths:
         - $ref: "#/components/parameters/UserId"
       responses:
         "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - example: {"msg": "", "result": "success"}
+          $ref: "#/components/responses/SimpleSuccess"
 
   /users/{user_id_or_email}/presence:
     get:
@@ -6445,7 +6544,7 @@ paths:
                           - 400
                           - 600
                         description: |
-                          [Organization-level role](/help/roles-and-permissions) of the user.
+                          [Organization-level role](/api/roles-and-permissions) of the user.
                           Possible values are:
 
                           - Organization owner => 100
@@ -6574,14 +6673,7 @@ paths:
         This endpoint is primarily useful to Zulip clients providing a user settings UI.
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - example: {"msg": "", "result": "success"}
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -6613,6 +6705,9 @@ paths:
 
         Clients that wish to set the user's status to a specific value should
         pass all supported parameters.
+
+        **Changes**: In Zulip 5.0 (feature level 86), added support for
+        `emoji_name`, `emoji_code`, and `reaction_type` parameters.
       parameters:
         - name: status_text
           schema:
@@ -6641,6 +6736,8 @@ paths:
           in: query
           description: |
             The name for the emoji to associate with this status.
+
+            **Changes**: New in Zulip 5.0 (feature level 86).
           example: car
           required: false
         - name: emoji_code
@@ -6651,8 +6748,7 @@ paths:
             A unique identifier, defining the specific emoji codepoint requested,
             within the namespace of the `reaction_type`.
 
-            For example, for `unicode_emoji`, this will be an encoding of the
-            Unicode codepoint; for `realm_emoji`, it'll be the ID of the realm emoji.
+            **Changes**: New in Zulip 5.0 (feature level 86).
           example: 1f697
           required: false
         - name: reaction_type
@@ -6660,28 +6756,30 @@ paths:
             type: string
           in: query
           description: |
-            One of the following values:
+            A string indicating the type of emoji. Each emoji `reaction_type`
+            has an independent namespace for values of `emoji_code`.
 
-            - `unicode_emoji`: Unicode emoji (`emoji_code` will be its Unicode
-              codepoint).
-            - `realm_emoji`: [Custom emoji](/help/custom-emoji).
-              (`emoji_code` will be its ID).
-            - `zulip_extra_emoji`: Special emoji included with Zulip. Exists to
-              namespace the `zulip` emoji.
+            Must be one of the following values:
+
+            - `unicode_emoji` : In this namespace, `emoji_code` will be a
+              dash-separated hex encoding of the sequence of Unicode codepoints
+              that define this emoji in the Unicode specification.
+
+            - `realm_emoji` : In this namespace, `emoji_code` will be the ID of
+              the uploaded [custom emoji](/help/custom-emoji).
+
+            - `zulip_extra_emoji` : These are special emoji included with Zulip.
+              In this namespace, `emoji_code` will be the name of the emoji (e.g.
+              "zulip").
+
+            **Changes**: New in Zulip 5.0 (feature level 86).
           example: unicode_emoji
           required: false
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - example: {"msg": "", "result": "success"}
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
-          description: Success.
+          description: Bad request.
           content:
             application/json:
               schema:
@@ -6810,7 +6908,7 @@ paths:
                   - example:
                       {
                         "code": "BAD_REQUEST",
-                        "msg": "Invalid stream id",
+                        "msg": "Invalid stream ID",
                         "result": "error",
                       }
                     description: |
@@ -7289,21 +7387,30 @@ paths:
               enum:
                 - stream_id
       parameters:
-        - name: stream
-          in: query
-          description: |
-            The name of the stream to access.
-          schema:
-            type: string
-          example: Denmark
-          required: false
         - name: stream_id
           in: query
           description: |
             The ID of the stream to access.
+
+            Clients must provide either `stream` or `stream_id` as a parameter
+            to this endpoint, but not both.
+
+            **Changes**: New in Zulip 2.0.
           schema:
             type: integer
           example: 43
+          required: false
+        - name: stream
+          in: query
+          description: |
+            The name of the stream to access.
+
+            Clients must provide either `stream` or `stream_id` as a parameter
+            to this endpoint, but not both. Clients should use `stream_id`
+            instead of the `stream` parameter when possible.
+          schema:
+            type: string
+          example: Denmark
           required: false
         - name: topic
           in: query
@@ -7327,13 +7434,7 @@ paths:
           required: true
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -7394,14 +7495,7 @@ paths:
         - $ref: "#/components/parameters/MutedUserId"
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - example: {"msg": "", "result": "success"}
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -7438,14 +7532,7 @@ paths:
         - $ref: "#/components/parameters/MutedUserId"
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - example: {"msg": "", "result": "success"}
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -7545,13 +7632,7 @@ paths:
                   example: /path/to/img.png
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
 
   /realm/emoji:
     get:
@@ -7731,13 +7812,7 @@ paths:
           required: true
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
     post:
       operationId: create-custom-profile-field
       summary: Create a custom profile field
@@ -7925,6 +8000,20 @@ paths:
           schema:
             type: boolean
           example: true
+        - name: display_emoji_reaction_users
+          in: query
+          description: |
+            Whether to display the names of reacting users on a message.
+
+            When enabled, clients should display the names of reacting users, rather than
+            a count, for messages with few total reactions. The ideal cutoff may depend on
+            the space available for displaying reactions; the official web application
+            displays names when <=3 total reactions are present with this setting enabled.
+
+            **Changes**: New in Zulip 6.0 (feature level 125).
+          schema:
+            type: boolean
+          example: false
         - name: default_view
           in: query
           description: |
@@ -8538,7 +8627,7 @@ paths:
         - name: role
           in: query
           description: |
-            New [role](/help/roles-and-permissions) for the user. Roles are encoded as:
+            New [role](/api/roles-and-permissions) for the user. Roles are encoded as:
 
             - Organization owner: 100
             - Organization administrator: 200
@@ -8606,16 +8695,9 @@ paths:
         - $ref: "#/components/parameters/UserId"
       responses:
         "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - example: {"msg": "", "result": "success"}
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
-          description: Bad request
+          description: Bad request.
           content:
             application/json:
               schema:
@@ -8746,13 +8828,7 @@ paths:
           required: true
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
     patch:
       operationId: update-linkifier
       summary: Update a linkifier
@@ -8778,13 +8854,7 @@ paths:
         - $ref: "#/components/parameters/LinkifierURLFormatString"
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
   /realm/playgrounds:
     post:
       operationId: add-code-playground
@@ -8866,13 +8936,7 @@ paths:
           required: true
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
   /register:
     post:
       operationId: register-queue
@@ -9052,8 +9116,12 @@ paths:
                       msg: {}
                       queue_id:
                         type: string
+                        nullable: true
                         description: |
                           The ID of the queue that has been allocated for your client.
+
+                          Will be None only for unauthenticated access in realms that have
+                          enabled the [public access option](/help/public-access-option).
                       last_event_id:
                         type: integer
                         description: |
@@ -9737,8 +9805,7 @@ paths:
                           error messages when a search returns limited results because
                           a stop word in the query was ignored.
                       user_status:
-                        allOf:
-                          - $ref: "#/components/schemas/EmojiBase"
+                        type: object
                         description: |
                           Present if `user_status` is present in `fetch_event_types`.
 
@@ -9747,9 +9814,6 @@ paths:
 
                           **Changes**: The emoji parameters are new in Zulip 5.0 (feature level 86).
                           Previously, Zulip did not support emoji associated with statuses.
-
-                          A status that does not have an emoji associated with it is encoded
-                          with `emoji_name=""`.
                         additionalProperties:
                           description: |
                             `{user_id}`: Object containing the status details of a user
@@ -9760,27 +9824,42 @@ paths:
                             away:
                               type: boolean
                               description: |
-                                Whether the user has marked themself "away".
+                                If present, the user has marked themself "away".
                             status_text:
                               type: string
                               description: |
-                                The text content of the status message.
+                                If present, the text content of the user's status message.
                             emoji_name:
                               type: string
                               description: |
-                                The [emoji name](/api/add-reaction#parameters) for the emoji associated with the new status.
+                                If present, the name for the emoji to associate with the user's status.
 
                                 **Changes**: New in Zulip 5.0 (feature level 86).
                             emoji_code:
                               type: string
                               description: |
-                                The [emoji code](/api/add-reaction#parameters) for the emoji associated with the new status.
+                                If present, a unique identifier, defining the specific emoji codepoint
+                                requested, within the namespace of the `reaction_type`.
 
                                 **Changes**: New in Zulip 5.0 (feature level 86).
                             reaction_type:
                               type: string
                               description: |
-                                The [emoji type](/api/add-reaction#parameters) for the emoji associated with the new status.
+                                If present, a string indicating the type of emoji. Each emoji
+                                `reaction_type` has an independent namespace for values of `emoji_code`.
+
+                                Must be one of the following values:
+
+                                - `unicode_emoji` : In this namespace, `emoji_code` will be a
+                                  dash-separated hex encoding of the sequence of Unicode codepoints
+                                  that define this emoji in the Unicode specification.
+
+                                - `realm_emoji` : In this namespace, `emoji_code` will be the ID of
+                                  the uploaded [custom emoji](/help/custom-emoji).
+
+                                - `zulip_extra_emoji` : These are special emoji included with Zulip.
+                                  In this namespace, `emoji_code` will be the name of the emoji (e.g.
+                                  "zulip").
 
                                 **Changes**: New in Zulip 5.0 (feature level 86).
                       user_settings:
@@ -9836,6 +9915,19 @@ paths:
                             description: |
                               Whether to [translate emoticons to emoji](/help/enable-emoticon-translations)
                               in messages the user sends.
+                          display_emoji_reaction_users:
+                            type: boolean
+                            description: |
+                              Whether to display the names of reacting users on a message.
+
+                              When enabled, clients should display the names of reacting
+                              users, rather than a count, for messages with few total
+                              reactions. The ideal cutoff may depend on the space
+                              available for displaying reactions; the official web
+                              application displays names when <=3 total reactions are
+                              present with this setting enabled.
+
+                              **Changes**: New in Zulip 6.0 (feature level 125).
                           default_language:
                             type: string
                             description: |
@@ -10669,16 +10761,19 @@ paths:
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy for which users can upload new custom emoji in this
-                          organization.
+                          The [policy][permission-level] for which users can upload new custom emoji
+                          in this organization.
 
                           - 1 = Members only
                           - 2 = Administrators only
-                          - 3 = Full members only
+                          - 3 = [Full members][calc-full-member] only
                           - 4 = Moderators only
 
                           **Changes**: New in Zulip 5.0 (feature level 85) replacing the
                           previous `realm_add_emoji_by_admins_only` boolean.
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_allow_edit_history:
                         type: boolean
                         description: |
@@ -10691,52 +10786,64 @@ paths:
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy defining which users can delete
+                          The [policy][permission-level] defining which users can delete
                           messages that they had sent.
 
                           - 1 = members only
                           - 2 = admins only
-                          - 3 = full members only
+                          - 3 = [full members][calc-full-member] only
                           - 4 = admins and moderators only
                           - 5 = everyone
 
                           **Changes**: New in Zulip 5.0 (feature level 101), replacing the
                           previous `allow_message_deleting` boolean;
                           `true` corresponded to `everyone`, and `false` to `admins only`.
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_bot_creation_policy:
                         type: integer
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy for which users can create bot users in this organization.
+                          The [policy](/api/roles-and-permissions#permission-levels)
+                          for which users can create bot users in this organization.
                       realm_create_public_stream_policy:
                         type: integer
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy for which users can create public streams in this organization.
+                          The [policy][permission-level] for which users can create public streams
+                          in this organization.
 
                           - 1 = members only
                           - 2 = admins only
-                          - 3 = full members only
+                          - 3 = [full members][calc-full-member] only
                           - 4 = admins and moderators only
 
                           **Changes**: Before Zulip 5.0 (feature level 102), permission to
                           create streams was controlled by the `realm_create_stream_policy` setting.
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_create_private_stream_policy:
                         type: integer
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy for which users can create private streams in this organization.
+                          The [policy][permission-level] for which users can create private streams
+                          in this organization.
 
                           - 1 = members only
                           - 2 = admins only
-                          - 3 = full members only
+                          - 3 = [full members][calc-full-member] only
                           - 4 = admins and moderators only
 
                           **Changes**: Before Zulip 5.0 (feature level 102), permission to
                           create streams was controlled by the `realm_create_stream_policy` setting.
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_create_web_public_stream_policy:
                         type: integer
                         description: |
@@ -10747,7 +10854,7 @@ paths:
                           server-level setting enabled and the organization has enabled
                           the `enable_spectator_access` realm setting.
 
-                          The policy for which users can create web
+                          The [policy][permission-level] for which users can create web
                           public streams in this organization. Allowed
                           values are:
 
@@ -10757,23 +10864,26 @@ paths:
                           - 7 = owners only
 
                           **Changes**: Added in Zulip 5.0 (feature level 103).
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
                       realm_invite_to_stream_policy:
                         type: integer
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy for which users can add other users to streams in this
-                          organization.
+                          The [policy](/api/roles-and-permissions#permission-levels)
+                          for which users can add other users to streams in this organization.
                       realm_wildcard_mention_policy:
                         type: integer
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy for who can use wildcard mentions in large streams.
+                          The [policy][permission-level] for who can use wildcard mentions
+                          in large streams.
 
                           - 1 => Any user can use wildcard mentions in large streams.
                           - 2 => Only members can use wildcard mentions in large streams.
-                          - 3 => Only full members can use wildcard mentions in large streams.
+                          - 3 => Only [full members][calc-full-member] can use wildcard mentions in large streams.
                           - 4 => Only stream and organization administrators can use wildcard mentions in large streams.
                           - 5 => Only organization administrators can use wildcard mentions in large streams.
                           - 6 => Nobody can use wildcard mentions in large streams.
@@ -10784,12 +10894,15 @@ paths:
 
                           **Changes**: New in Zulip 4.0 (feature level 33). Moderators option added in
                           Zulip 4.0 (feature level 62).
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_default_language:
                         type: string
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The default UI language for new users joining this organization.
+                          The [notifications language for the organization](/help/change-the-default-language-for-your-organization).
                       realm_description:
                         type: string
                         description: |
@@ -10814,14 +10927,16 @@ paths:
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy for which users in this organization can see the
-                          real email addresses of other users.
+                          The [policy][permission-level] for which users in this organization can see
+                          the real email addresses of other users.
 
                           - 1 = everyone
                           - 2 = members only
                           - 3 = administrators only
                           - 4 = nobody (though note that administrators can change this setting).
                           - 5 = moderators only
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
                       realm_email_changes_disabled:
                         type: boolean
                         description: |
@@ -10841,30 +10956,38 @@ paths:
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          Policy for [who can invite new users](/help/restrict-account-creation#change-who-can-send-invitations)
+                          [Policy][permission-level] for [who can invite new
+                          users](/help/restrict-account-creation#change-who-can-send-invitations)
                           to join the organization:
 
                           - 1 = Members only
                           - 2 = Administrators only
-                          - 3 = Full members only
+                          - 3 = [Full members][calc-full-member] only
                           - 4 = Moderators only
                           - 6 = Nobody
 
                           **Changes**: New in Zulip 4.0 (feature level 50) replacing the
                           previous `realm_invite_by_admins_only` boolean.
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_move_messages_between_streams_policy:
                         type: integer
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy for which users can move messages from one stream to another.
+                          The [policy][permission-level] for which users can move messages
+                          from one stream to another.
 
                           - 1 = Members only
                           - 2 = Administrators only
-                          - 3 = Full members only
+                          - 3 = [Full members][calc-full-member] only
                           - 4 = Moderators only
 
                           **Changes**: New in Zulip 4.0 (feature level 56)
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_inline_image_preview:
                         type: boolean
                         description: |
@@ -10962,6 +11085,23 @@ paths:
                           setting.
 
                           **Changes**: New in Zulip 5.0 (feature level 109).
+
+                          [server-settings]: https://zulip.readthedocs.io/en/stable/production/settings.html
+                      realm_want_advertise_in_communities_directory:
+                        type: boolean
+                        description: |
+                          Present if `realm` is present in `fetch_event_types`.
+
+                          Whether the organization has given permission to be advertised in the
+                          Zulip [communities directory](/help/communities-directory).
+
+                          Useful only to clients supporting changing this setting for the
+                          organization.
+
+                          Giving permission via this setting does not guarantee that an
+                          organization will be listed in the Zulip communities directory.
+
+                          **Changes**: New in Zulip 6.0 (feature level 129).
                       realm_video_chat_provider:
                         type: integer
                         description: |
@@ -10982,8 +11122,10 @@ paths:
                           Present if `realm` is present in `fetch_event_types`.
 
                           Members whose accounts have been created at least this many days ago
-                          will be treated as [full members](/help/restrict-permissions-of-new-members)
+                          will be treated as [full members][calc-full-member]
                           for the purpose of settings that restrict access to new members.
+
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_digest_weekday:
                         type: integer
                         description: |
@@ -10996,7 +11138,8 @@ paths:
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          Policy for [who can send private messages](/help/restrict-private-messages)
+                          [Policy](/api/roles-and-permissions#permission-levels)
+                          for [who can send private messages](/help/restrict-private-messages)
                           in this organization.
 
                           - 1 = Everyone
@@ -11006,15 +11149,17 @@ paths:
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The organization's policy for [who can manage user groups
-                          ][user-group-permissions].
+                          The organization's [policy][permission-level] for
+                          [who can manage user groups][user-group-permissions].
 
                           - 1 = All members can create and edit user groups
                           - 2 = Only organization administrators can create and edit user groups
-                          - 3 = Only full members can create and edit user groups.
+                          - 3 = Only [full members][calc-full-member] can create and edit user groups.
                           - 4 = Only organization administrators and moderators can create and edit user groups.
 
                           [user-group-permissions]: /help/user-groups#configure-who-can-create-and-manage-user-groups
+                          [permission-level]: /api/roles-and-permissions#permission-levels
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_default_code_block_language:
                         type: string
                         nullable: true
@@ -11063,16 +11208,19 @@ paths:
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The policy for which users can edit topics of any message.
+                          The [policy][permission-level] for which users can edit topics of any message.
 
                           - 1 = members only
                           - 2 = admins only
-                          - 3 = full members only
+                          - 3 = [full members][calc-full-member] only
                           - 4 = moderators only
                           - 5 = everyone
 
                           **Changes**: New in Zulip 5.0 (feature level 75), replacing the
                           previous `allow_community_topic_editing` boolean.
+
+                          [permission-level]: /api/roles-and-permissions#permission-levels
+                          [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
                       realm_message_content_edit_limit_seconds:
                         type: integer
                         description: |
@@ -11273,6 +11421,31 @@ paths:
 
                           **Changes**: New in Zulip 5.0 (feature level 72). Previously,
                           this was called `realm_upload_quota`.
+                      realm_org_type:
+                        type: integer
+                        description: |
+                          Present if `realm` is present in `fetch_event_types`.
+
+                          The [organization type](/help/organization-type) for the realm.
+                          Useful only to clients supporting changing this setting for the
+                          organization, or clients implementing onboarding content or
+                          other features that varies with organization type.
+
+                          - 0 = Unspecified
+                          - 10 = Business
+                          - 20 = Open-source project
+                          - 30 = Education (non-profit)
+                          - 35 = Education (for-profit)
+                          - 40 = Research
+                          - 50 = Event or conference
+                          - 60 = Non-profit (registered)
+                          - 70 = Government
+                          - 80 = Political group
+                          - 90 = Community
+                          - 100 = Personal
+                          - 1000 = Other
+
+                          **Changes**: New in Zulip 6.0 (feature level 128).
                       realm_plan_type:
                         type: integer
                         description: |
@@ -11463,7 +11636,7 @@ paths:
 
                           The value of the `WEB_PUBLIC_STREAMS_ENABLED` Zulip server level
                           setting. A server that has disabled this setting intends to not offer [web
-                          public streams](/help/web-public-streams) to realms it hosts. (Zulip Cloud
+                          public streams](/help/public-access-option) to realms it hosts. (Zulip Cloud
                           defaults to `True`; self-hosted servers default to `False`).
 
                           Clients should use this to determine whether to offer UI for the
@@ -11561,6 +11734,19 @@ paths:
                             description: |
                               Whether to [translate emoticons to emoji](/help/enable-emoticon-translations)
                               in messages the user sends.
+                          display_emoji_reaction_users:
+                            type: boolean
+                            description: |
+                              Whether to display the names of reacting users on a message.
+
+                              When enabled, clients should display the names of reacting
+                              users, rather than a count, for messages with few total
+                              reactions. The ideal cutoff may depend on the space
+                              available for displaying reactions; the official web
+                              application displays names when <=3 total reactions are
+                              present with this setting enabled.
+
+                              **Changes**: New in Zulip 6.0 (feature level 125).
                           default_language:
                             type: string
                             description: |
@@ -11890,13 +12076,13 @@ paths:
                         description: |
                           Present if `realm_user` is present in `fetch_event_types`.
 
-                          Whether the current user is an [organization administrator](/help/roles-and-permissions).
+                          Whether the current user is an [organization administrator](/api/roles-and-permissions).
                       is_owner:
                         type: boolean
                         description: |
                           Present if `realm_user` is present in `fetch_event_types`.
 
-                          Whether the current user is an [organization owner](/help/roles-and-permissions).
+                          Whether the current user is an [organization owner](/api/roles-and-permissions).
                       is_billing_admin:
                         type: boolean
                         description: |
@@ -11910,7 +12096,7 @@ paths:
                         description: |
                           Present if `realm_user` is present in `fetch_event_types`.
 
-                          Whether the current user is an [organization moderator](/help/roles-and-permissions).
+                          Whether the current user is an [organization moderator](/api/roles-and-permissions).
 
                           **Changes**: New in Zulip 4.0 (feature level 60).
                       is_guest:
@@ -11918,7 +12104,7 @@ paths:
                         description: |
                           Present if `realm_user` is present in `fetch_event_types`.
 
-                          Whether the current user is a [guest user](/help/roles-and-permissions).
+                          Whether the current user is a [guest user](/api/roles-and-permissions).
                       enter_sends:
                         deprecated: true
                         type: boolean
@@ -11979,27 +12165,24 @@ paths:
                             - $ref: "#/components/schemas/UserBase"
                             - additionalProperties: false
                               properties:
-                                email: {}
-                                is_bot: {}
-                                avatar_url:
-                                  nullable: true
-                                avatar_version: {}
-                                full_name: {}
-                                is_admin: {}
-                                is_owner: {}
-                                is_billing_admin: {}
-                                role: {}
-                                bot_type:
-                                  nullable: true
                                 user_id: {}
-                                bot_owner_id:
-                                  nullable: true
-                                is_active: {}
-                                is_guest: {}
-                                timezone: {}
-                                date_joined: {}
                                 delivery_email: {}
-                                profile_data: {}
+                                email: {}
+                                full_name: {}
+                                date_joined: {}
+                                is_active: {}
+                                is_owner: {}
+                                is_admin: {}
+                                is_guest: {}
+                                is_billing_admin: {}
+                                is_bot: {}
+                                # Referenced schema properties are rendered before any
+                                # non-referenced properties in the API documentation, so
+                                # `is_system_bot` appears last instead of in this order.
+                                # General practice should be to define properties in the
+                                # same order that they are rendered in the API documentation.
+                                # TODO: See if we can match the order of properties as
+                                # listed here when rendered in the API documentation.
                                 is_system_bot:
                                   type: boolean
                                   description: |
@@ -12009,6 +12192,16 @@ paths:
 
                                     **Changes**: This field was called `is_cross_realm_bot`
                                     before Zulip 5.0 (feature level 83).
+                                bot_type:
+                                  nullable: true
+                                bot_owner_id:
+                                  nullable: true
+                                role: {}
+                                timezone: {}
+                                avatar_url:
+                                  nullable: true
+                                avatar_version: {}
+                                profile_data: {}
                     example:
                       {
                         "last_event_id": -1,
@@ -12264,7 +12457,7 @@ paths:
                         type: boolean
                         description: |
                           Whether the organization has enabled the creation of
-                          [web-public streams](/help/web-public-streams) and
+                          [web-public streams](/help/public-access-option) and
                           at least one web-public stream on the server currently
                           exists. Clients that support viewing content
                           in web-public streams without an account can
@@ -12504,6 +12697,20 @@ paths:
           schema:
             type: boolean
           example: true
+        - name: display_emoji_reaction_users
+          in: query
+          description: |
+            Whether to display the names of reacting users on a message.
+
+            When enabled, clients should display the names of reacting users, rather than
+            a count, for messages with few total reactions. The ideal cutoff may depend on
+            the space available for displaying reactions; the official web application
+            displays names when <=3 total reactions are present with this setting enabled.
+
+            **Changes**: New in Zulip 6.0 (feature level 125).
+          schema:
+            type: boolean
+          example: false
         - name: default_language
           in: query
           description: |
@@ -12930,7 +13137,7 @@ paths:
                   - example:
                       {
                         "code": "BAD_REQUEST",
-                        "msg": "Invalid stream id",
+                        "msg": "Invalid stream ID",
                         "result": "error",
                       }
                     description: |
@@ -13113,6 +13320,67 @@ paths:
                       `include_all_active` parameter (i.e. because they are not an organization
                       administrator):
   /streams/{stream_id}:
+    get:
+      operationId: get-stream-by-id
+      summary: Get a stream by ID
+      tags: ["streams"]
+      description: |
+        Fetch details for the stream with the ID `stream_id`.
+
+        `GET {{ api_url }}/v1/streams/{stream_id}`
+
+        **Changes**: New in Zulip 6.0 (feature level 132).
+      parameters:
+        - $ref: "#/components/parameters/StreamIdInPath"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - $ref: "#/components/schemas/SuccessDescription"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      stream:
+                        $ref: "#/components/schemas/BasicStream"
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "stream":
+                          {
+                            "description": "A Scandinavian country",
+                            "first_message_id": 1,
+                            "history_public_to_subscribers": True,
+                            "invite_only": False,
+                            "is_announcement_only": False,
+                            "is_web_public": False,
+                            "message_retention_days": null,
+                            "name": "Denmark",
+                            "rendered_description": "<p>A Scandinavian country</p>",
+                            "stream_id": 7,
+                            "stream_post_policy": 1,
+                          },
+                      }
+        "400":
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CodedError"
+                  - example:
+                      {
+                        "code": "BAD_REQUEST",
+                        "msg": "Invalid stream ID",
+                        "result": "error",
+                      }
+                    description: |
+                      An example JSON response for when the stream ID is not valid.
     delete:
       operationId: archive-stream
       summary: Archive a stream
@@ -13125,14 +13393,7 @@ paths:
         - $ref: "#/components/parameters/StreamIdInPath"
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - example: {"msg": "", "result": "success"}
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -13143,7 +13404,7 @@ paths:
                   - example:
                       {
                         "code": "BAD_REQUEST",
-                        "msg": "Invalid stream id",
+                        "msg": "Invalid stream ID",
                         "result": "error",
                       }
                     description: |
@@ -13241,14 +13502,7 @@ paths:
         - $ref: "#/components/parameters/MessageRetentionDays"
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - example: {"msg": "", "result": "success"}
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -13259,7 +13513,7 @@ paths:
                   - example:
                       {
                         "code": "BAD_REQUEST",
-                        "msg": "Invalid stream id",
+                        "msg": "Invalid stream ID",
                         "result": "error",
                       }
                     description: |
@@ -13289,15 +13543,9 @@ paths:
           required: true
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
-          description: Error.
+          description: Bad request.
           content:
             application/json:
               schema:
@@ -13324,22 +13572,26 @@ paths:
 
         Clients implementing Zulip's typing notifications protocol should work as follows:
 
-        - Send a request to this endpoint with `op="start"` when a user starts typing a message,
-          and also every `TYPING_STARTED_WAIT_PERIOD=10` seconds that the user continues to
-          actively type or otherwise interact with the compose UI (E.g. interacting with the
+        - Send a request to this endpoint with `op = "start"` when a user starts typing a message,
+          and also every `TYPING_STARTED_WAIT_PERIOD = 10` seconds that the user continues to
+          actively type or otherwise interact with the compose UI (e.g. interacting with the
           compose box emoji picker).
-        - Send a request to this endpoint with `op="stop"` when a user pauses using the
-          compose UI for at least `TYPING_STOPPED_WAIT_PERIOD=5` seconds or cancels
+        - Send a request to this endpoint with `op = "stop"` when a user pauses using the
+          compose UI for at least `TYPING_STOPPED_WAIT_PERIOD = 5` seconds or cancels
           the compose action (if it had previously sent a "start" operation for that
           compose action).
         - Start displaying "Sender is typing" for a given conversation when the client
-          receives an `op="start"` event from the [events API](/api/get-events).
-        - Continue displaying "Sender is typing" until they receive an `op="stop"` event
-          from the [events API](/api/get-events) or `TYPING_STARTED_EXPIRY_PERIOD=15`
-          seconds have passed without a new `op="start"` event for that conversation.
-        - Clients that support displaying stream typing notifications (new in Zulip 4.0)
-          should indicate they support processing stream typing events via the
-          `stream_typing_notifications` in the `client_capabilities` parameter to `/register`.
+          receives an `op = "start"` event from the [`GET /events`](/api/get-events#typing-start)
+          endpoint.
+        - Continue displaying "Sender is typing" until they receive an `op = "stop"` event
+          from the [`GET /events`](/api/get-events#typing-stop) endpoint or
+          `TYPING_STARTED_EXPIRY_PERIOD = 15` seconds have passed without a new `op = "start"`
+          event for that conversation.
+        - Support for displaying stream typing notifications was new in Zulip 4.0
+          (feature level 58). Clients should indicate they support processing stream typing
+          events via the `stream_typing_notifications` value in the `client_capabilities`
+          parameter to [`POST /register`](/api/register-queue#parameter-client_capabilities)
+          endpoint.
 
         This protocol is designed to allow the server-side typing notifications implementation
         to be stateless while being resilient; network failures cannot result in a user being
@@ -13359,6 +13611,9 @@ paths:
           in: query
           description: |
             Type of the message being composed.
+
+            **Changes**: New in Zulip 4.0 (feature level 58). Previously, typing
+            notifications were only for private messages.
           schema:
             type: string
             enum:
@@ -13369,7 +13624,7 @@ paths:
         - name: op
           in: query
           description: |
-            Whether the user has started (`start`) or stopped (`stop`) to type.
+            Whether the user has started (`"start"`) or stopped (`"stop"`) typing.
           schema:
             type: string
             enum:
@@ -13380,14 +13635,18 @@ paths:
         - name: to
           in: query
           description: |
-            For 'private' type it is the user_ids of the recipients of the message being typed.
+            For `"private"` type it is the user_ids of the recipients of the message being typed.
             Send a JSON-encoded list of user_ids. (Use a list even if there is only one
             recipient.)
 
-            For 'stream' type it is a single element list containing ID of stream in
+            For `"stream"` type it is a single element list containing ID of stream in
             which the message is being typed.
 
-            **Changes**: Before Zulip 2.0, this parameter accepted only a JSON-encoded
+            **Changes**: Support for typing notifications for stream messages
+            is new in Zulip 4.0 (feature level 58). Previously, typing
+            notifications were only for private messages.
+
+            Before Zulip 2.0, this parameter accepted only a JSON-encoded
             list of email addresses. Support for the email address-based format was
             removed in Zulip 3.0 (feature level 11).
           content:
@@ -13401,20 +13660,17 @@ paths:
         - name: topic
           in: query
           description: |
-            Topic to which message is being typed. Required for the 'stream' type.
-            Ignored in case of 'private' type.
+            Topic to which message is being typed. Required for the `"stream"` type.
+            Ignored in the case of `"private"` type.
+
+            **Changes**: New in Zulip 4.0 (feature level 58). Previously, typing
+            notifications were only for private messages.
           schema:
             type: string
           example: typing notifications
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -13472,14 +13728,7 @@ paths:
           required: true
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - example: {"msg": "", "result": "success"}
+          $ref: "#/components/responses/SimpleSuccess"
         "400":
           description: Bad request.
           content:
@@ -13539,6 +13788,40 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/SimpleSuccess"
+    get:
+      operationId: get-user-group-members
+      summary: Get user group members
+      tags: ["users"]
+      description: |
+        Get the members of a [user group](/help/user-groups).
+
+        `GET {{ api_url }}/v1/user_groups/{user_group_id}/members`
+
+        **Changes**: New in Zulip 6.0 (feature level 127).
+      parameters:
+        - $ref: "#/components/parameters/UserGroupId"
+        - $ref: "#/components/parameters/DirectMemberOnly"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - $ref: "#/components/schemas/SuccessDescription"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      members:
+                        type: array
+                        items:
+                          type: integer
+                        description: |
+                          A list containing the user IDs of members of the user group.
+                    example:
+                      {"msg": "", "result": "success", "members": [10, 12]}
   /user_groups/{user_group_id}:
     patch:
       operationId: update-user-group
@@ -13597,14 +13880,7 @@ paths:
         - $ref: "#/components/parameters/UserGroupId"
       responses:
         "200":
-          description: Success.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/JsonSuccess"
-                  - $ref: "#/components/schemas/SuccessDescription"
-                  - example: {"result": "success", "msg": ""}
+          $ref: "#/components/responses/SimpleSuccess"
 
         "400":
           description: Bad request.
@@ -13666,6 +13942,17 @@ paths:
                                 The integer user IDs of the user group members.
                               items:
                                 type: integer
+                            direct_subgroup_ids:
+                              type: array
+                              description: |
+                                The integer user group IDs of the direct subgroups.
+
+                                **Changes**: New in Zulip 6.0 (feature level 131).
+                                Introduced in feature level 127 as `subgroups`, but
+                                clients can ignore older events as this feature level
+                                predates subgroups being fully implemented.
+                              items:
+                                type: integer
                             name:
                               type: string
                               description: |
@@ -13691,6 +13978,7 @@ paths:
                               "id": 1,
                               "name": "hamletcharacters",
                               "members": [3, 4],
+                              "direct_subgroup_ids": [],
                               "is_system_group": false,
                             },
                             {
@@ -13698,9 +13986,137 @@ paths:
                               "id": 2,
                               "name": "other users",
                               "members": [1, 2],
+                              "direct_subgroup_ids": [1, 2],
                               "is_system_group": true,
                             },
                           ],
+                      }
+  /user_groups/{user_group_id}/subgroups:
+    post:
+      operationId: update-user-group-subgroups
+      summary: Update subgroups of a user group
+      tags: ["users"]
+      description: |
+        Update the subgroups of a [user group](/help/user-groups).
+
+        `POST {{ api_url }}/v1/user_groups/{user_group_id}/subgroups`
+
+        **Changes**: New in Zulip 6.0 (feature level 127).
+      x-curl-examples-parameters:
+        oneOf:
+          - type: exclude
+            parameters:
+              enum:
+                - delete
+      parameters:
+        - $ref: "#/components/parameters/UserGroupId"
+        - name: delete
+          in: query
+          description: |
+            The list of user group ids to be removed from the user group.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+              example: [10]
+          required: false
+        - name: add
+          in: query
+          description: |
+            The list of user group ids to be added to the user group.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+              example: [1, 2]
+          required: false
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+    get:
+      operationId: get-user-group-subgroups
+      summary: Get subgroups of the user group
+      tags: ["users"]
+      description: |
+        Get the subgroups of a [user group](/help/user-groups).
+
+        `GET {{ api_url }}/v1/user_groups/{user_group_id}/subgroups`
+
+        **Changes**: New in Zulip 6.0 (feature level 127).
+      parameters:
+        - $ref: "#/components/parameters/UserGroupId"
+        - name: direct_subgroup_only
+          in: query
+          description: |
+            Whether to consider only direct subgroups of the user group
+            or subgroups of subgroups also.
+          schema:
+            type: boolean
+            default: false
+          example: true
+          required: false
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - $ref: "#/components/schemas/SuccessDescription"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      subgroups:
+                        type: array
+                        items:
+                          type: integer
+                        description: |
+                          A list containing the IDs of subgroups of the user group.
+                    example:
+                      {"msg": "", "result": "success", "subgroups": [2, 3]}
+  /user_groups/{user_group_id}/members/{user_id}:
+    get:
+      operationId: get-is-user-group-member
+      summary: Get user group membership status
+      tags: ["users"]
+      description: |
+        Check whether a user is member of user group.
+
+        `GET {{ api_url }}/v1/user_groups/{user_group_id}/members/{user_id}`
+
+        **Changes**: New in Zulip 6.0 (feature level 127).
+      parameters:
+        - $ref: "#/components/parameters/UserGroupId"
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/DirectMemberOnly"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - $ref: "#/components/schemas/SuccessDescription"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      is_user_group_member:
+                        type: boolean
+                        description: |
+                          Whether the user is member of user group.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "is_user_group_member": false,
                       }
   /real-time:
     # This entry is a hack; it exists to give us a place to put the text
@@ -14074,15 +14490,18 @@ components:
         stream_post_policy:
           type: integer
           description: |
-            Policy for which users can post messages to the stream.
+            [Policy][permission-level] for which users can post messages to the stream.
 
             - 1 => Any user can post.
             - 2 => Only administrators can post.
-            - 3 => Only full members can post.
+            - 3 => Only [full members][calc-full-member] can post.
             - 4 => Only moderators can post.
 
             **Changes**: New in Zulip 3.0, replacing the previous
             `is_announcement_only` boolean.
+
+            [permission-level]: /api/roles-and-permissions#permission-levels
+            [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
         message_retention_days:
           type: integer
           nullable: true
@@ -14506,6 +14925,18 @@ components:
           description: |
             Array containing the id of the users who are
             members of this user group.
+        direct_subgroup_ids:
+          type: array
+          items:
+            type: integer
+          description: |
+            Array containing the id of the direct_subgroups of
+            this user group.
+
+            **Changes**: New in Zulip 6.0 (feature level 131).
+            Introduced in feature level 127 as `subgroups`, but
+            clients can ignore older events as this feature level
+            predates subgroups being fully implemented.
         id:
           type: integer
           description: |
@@ -14687,15 +15118,18 @@ components:
         stream_post_policy:
           type: integer
           description: |
-            Policy for which users can post messages to the stream.
+            [Policy][permission-level] for which users can post messages to the stream.
 
             - 1 => Any user can post.
             - 2 => Only administrators can post.
-            - 3 => Only full members can post.
+            - 3 => Only [full members][calc-full-member] can post.
             - 4 => Only moderators can post.
 
             **Changes**: New in Zulip 3.0, replacing the previous
             `is_announcement_only` boolean.
+
+            [permission-level]: /api/roles-and-permissions#permission-levels
+            [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
         message_retention_days:
           type: integer
           nullable: true
@@ -14776,29 +15210,33 @@ components:
     EmojiBase:
       type: object
       properties:
+        emoji_name:
+          type: string
+          description: |
+            Name of the emoji.
         emoji_code:
           type: string
           description: |
             A unique identifier, defining the specific emoji codepoint requested,
             within the namespace of the `reaction_type`.
-
-            For example, for `unicode_emoji`, this will be an encoding of the
-            Unicode codepoint; for `realm_emoji`, it'll be the ID of the realm emoji.
-        emoji_name:
-          type: string
-          description: |
-            Name of the emoji.
         reaction_type:
           type: string
           description: |
-            One of the following values:
+            A string indicating the type of emoji. Each emoji `reaction_type`
+            has an independent namespace for values of `emoji_code`.
 
-            - `unicode_emoji`: Unicode emoji (`emoji_code` will be its Unicode
-              codepoint).
-            - `realm_emoji`: [Custom emoji](/help/custom-emoji).
-              (`emoji_code` will be its ID).
-            - `zulip_extra_emoji`: Special emoji included with Zulip. Exists to
-              namespace the `zulip` emoji.
+            Must be one of the following values:
+
+            - `unicode_emoji` : In this namespace, `emoji_code` will be a
+              dash-separated hex encoding of the sequence of Unicode codepoints
+              that define this emoji in the Unicode specification.
+
+            - `realm_emoji` : In this namespace, `emoji_code` will be the ID of
+              the uploaded [custom emoji](/help/custom-emoji).
+
+            - `zulip_extra_emoji` : These are special emoji included with Zulip.
+              In this namespace, `emoji_code` will be the name of the emoji (e.g.
+              "zulip").
     EmojiReactionBase:
       allOf:
         - $ref: "#/components/schemas/EmojiBase"
@@ -15219,32 +15657,43 @@ components:
         - $ref: "#/components/schemas/UserBase"
         - additionalProperties: false
           properties:
+            user_id: {}
+            delivery_email: {}
             email: {}
+            full_name: {}
+            date_joined: {}
+            is_active: {}
+            is_owner: {}
+            is_admin: {}
+            is_guest: {}
+            is_billing_admin: {}
             is_bot: {}
+            bot_type:
+              nullable: true
+            bot_owner_id:
+              nullable: true
+            role: {}
+            timezone: {}
             avatar_url:
               nullable: true
             avatar_version: {}
-            full_name: {}
-            is_admin: {}
-            is_owner: {}
-            is_billing_admin: {}
-            role: {}
-            bot_type:
-              nullable: true
-            user_id: {}
-            bot_owner_id:
-              nullable: true
-            is_active: {}
-            is_guest: {}
-            timezone: {}
-            date_joined: {}
-            delivery_email: {}
             profile_data: {}
     UserBase:
       type: object
       description: |
         A dictionary containing basic data on a given Zulip user.
       properties:
+        user_id:
+          type: integer
+          description: |
+            The unique ID of the user.
+        delivery_email:
+          type: string
+          description: |
+            The user's real email address. This field is present only if
+            [email address visibility](/help/restrict-visibility-of-email-addresses) is
+            limited and you are an administrator with access to real email addresses
+            under the configured policy.
         email:
           type: string
           description: |
@@ -15252,10 +15701,90 @@ components:
 
             If you do not have permission to view the email address of the target user,
             this will be a fake email address that is usable for the Zulip API but nothing else.
+        full_name:
+          type: string
+          description: |
+            Full name of the user or bot, used for all display purposes.
+        date_joined:
+          type: string
+          description: |
+            The time the user account was created.
+        is_active:
+          type: boolean
+          description: |
+            A boolean specifying whether the user account has been deactivated.
+        is_owner:
+          type: boolean
+          description: |
+            A boolean specifying whether the user is an organization owner.
+            If true, `is_admin` will also be true.
+
+            **Changes**: New in Zulip 3.0 (feature level 8).
+        is_admin:
+          type: boolean
+          description: |
+            A boolean specifying whether the user is an organization administrator.
+        is_guest:
+          type: boolean
+          description: |
+            A boolean specifying whether the user is a guest user.
+        is_billing_admin:
+          type: boolean
+          description: |
+            A boolean specifying whether the user is a billing administrator.
+
+            **Changes**: New in Zulip 5.0 (feature level 73).
         is_bot:
           type: boolean
           description: |
             A boolean specifying whether the user is a bot or full account.
+        bot_type:
+          type: integer
+          nullable: true
+          description: |
+            An integer describing the type of bot:
+
+            - `null` if the user isn't a bot.
+            - `1` for a `Generic` bot.
+            - `2` for an `Incoming webhook` bot.
+            - `3` for an `Outgoing webhook` bot.
+            - `4` for an `Embedded` bot.
+        bot_owner_id:
+          type: integer
+          nullable: true
+          description: |
+            If the user is a bot (i.e. `is_bot` is `True`),
+            `bot_owner` is the user ID of the bot's owner (usually, whoever
+            created the bot).
+
+            Will be null for legacy bots that do not have an owner.
+
+            **Changes**: New in Zulip 3.0 (feature level
+            1). In previous versions, there was a `bot_owner` field
+            containing the email address of the bot's owner.
+        role:
+          type: integer
+          enum:
+            - 100
+            - 200
+            - 300
+            - 400
+            - 600
+          description: |
+            [Organization-level role](/api/roles-and-permissions) of the user.
+            Possible values are:
+
+            - Organization owner => 100
+            - Organization administrator => 200
+            - Organization moderator => 300
+            - Member => 400
+            - Guest => 600
+
+            **Changes**: New in Zulip 4.0 (feature level 59).
+        timezone:
+          type: string
+          description: |
+            The time zone of the user.
         avatar_url:
           type: string
           nullable: true
@@ -15273,102 +15802,13 @@ components:
             Version for the user's avatar. Used for cache-busting requests
             for the user's avatar. Clients generally shouldn't need to use this;
             most avatar URLs sent by Zulip will already end with `?v={avatar_version}`.
-        full_name:
-          type: string
-          description: |
-            Full name of the user or bot, used for all display purposes.
-        is_admin:
-          type: boolean
-          description: |
-            A boolean specifying whether the user is an organization administrator.
-        is_owner:
-          type: boolean
-          description: |
-            A boolean specifying whether the user is an organization owner.
-            If true, `is_admin` will also be true.
-
-            **Changes**: New in Zulip 3.0 (feature level 8).
-        is_billing_admin:
-          type: boolean
-          description: |
-            A boolean specifying whether the user is a billing administrator.
-
-            **Changes**: New in Zulip 5.0 (feature level 73).
-        role:
-          type: integer
-          enum:
-            - 100
-            - 200
-            - 300
-            - 400
-            - 600
-          description: |
-            [Organization-level role](/help/roles-and-permissions) of the user.
-            Possible values are:
-
-            - Organization owner => 100
-            - Organization administrator => 200
-            - Organization moderator => 300
-            - Member => 400
-            - Guest => 600
-
-            **Changes**: New in Zulip 4.0 (feature level 59).
-        bot_type:
-          type: integer
-          nullable: true
-          description: |
-            An integer describing the type of bot:
-
-            - `null` if the user isn't a bot.
-            - `1` for a `Generic` bot.
-            - `2` for an `Incoming webhook` bot.
-            - `3` for an `Outgoing webhook` bot.
-            - `4` for an `Embedded` bot.
-        user_id:
-          type: integer
-          description: |
-            The unique ID of the user.
-        bot_owner_id:
-          type: integer
-          nullable: true
-          description: |
-            If the user is a bot (i.e. `is_bot` is `True`),
-            `bot_owner` is the user ID of the bot's owner (usually, whoever
-            created the bot).
-
-            Will be null for legacy bots that do not have an owner.
-
-            **Changes**: New in Zulip 3.0 (feature level
-            1). In previous versions, there was a `bot_owner` field
-            containing the email address of the bot's owner.
-        is_active:
-          type: boolean
-          description: |
-            A boolean specifying whether the user account has been deactivated.
-        is_guest:
-          type: boolean
-          description: |
-            A boolean specifying whether the user is a guest user.
-        timezone:
-          type: string
-          description: |
-            The time zone of the user.
-        date_joined:
-          type: string
-          description: |
-            The time the user account was created.
-        delivery_email:
-          type: string
-          description: |
-            The user's real email address. This field is present only if
-            [email address visibility](/help/restrict-visibility-of-email-addresses) is
-            limited and you are an administrator with access to real email addresses
-            under the configured policy.
         profile_data:
           $ref: "#/components/schemas/profile_data"
     profile_data:
       type: object
       description: |
+        Only present if `is_bot` is false; bots can't have custom profile fields.
+
         A dictionary containing custom profile field data for the user. Each entry
         maps the integer ID of a custom profile field in the organization to a
         dictionary containing the user's data for that field. Generally the data
@@ -15505,15 +15945,11 @@ components:
             }
     InvalidMessageError:
       allOf:
-        - $ref: "#/components/schemas/JsonSuccessBase"
+        - $ref: "#/components/schemas/JsonErrorBase"
         - additionalProperties: false
           properties:
             result: {}
             msg: {}
-            raw_content:
-              type: string
-              description: |
-                The raw content of the message.
           example:
             {
               "msg": "Invalid message(s)",
@@ -15850,15 +16286,18 @@ components:
       name: stream_post_policy
       in: query
       description: |
-        Policy for which users can post messages to the stream.
+        [Policy][permission-level] for which users can post messages to the stream.
 
         - 1 => Any user can post.
         - 2 => Only administrators can post.
-        - 3 => Only full members can post.
+        - 3 => Only [full members][calc-full-member] can post.
         - 4 => Only moderators can post.
 
         **Changes**: New in Zulip 3.0, replacing the previous
         `is_announcement_only` boolean.
+
+        [permission-level]: /api/roles-and-permissions#permission-levels
+        [calc-full-member]: /api/roles-and-permissions#determining-if-a-user-is-a-full-member
       schema:
         type: integer
         default: 1
@@ -15932,14 +16371,23 @@ components:
       name: reaction_type
       in: query
       description: |
-        If an app is adding/removing a vote on an existing reaction,
+        A string indicating the type of emoji. Each emoji `reaction_type`
+        has an independent namespace for values of `emoji_code`.
+
+        If an API client is adding/removing a vote on an existing reaction,
         it should pass this parameter using the value the server provided
         for the existing reaction for specificity. Supported values:
 
-        - `unicode_emoji`: Unicode emoji (`emoji_code` will be its Unicode codepoint).
-        - `realm_emoji`: Custom emoji. (`emoji_code` will be its ID).
-        - `zulip_extra_emoji`: Special emoji included with Zulip. Exists to
-          namespace the `zulip` emoji.
+        - `unicode_emoji` : In this namespace, `emoji_code` will be a
+          dash-separated hex encoding of the sequence of Unicode codepoints
+          that define this emoji in the Unicode specification.
+
+        - `realm_emoji` : In this namespace, `emoji_code` will be the ID of
+          the uploaded [custom emoji](/help/custom-emoji).
+
+        - `zulip_extra_emoji` : These are special emoji included with Zulip.
+          In this namespace, `emoji_code` will be the name of the emoji (e.g.
+          "zulip").
 
         **Changes**: In Zulip 3.0 (feature level 2), this become
         optional for [custom emoji](/help/custom-emoji);
@@ -16016,3 +16464,13 @@ components:
         type: string
       example: https://github.com/zulip/zulip/issues/%(id)s
       required: true
+    DirectMemberOnly:
+      name: direct_member_only
+      in: query
+      description: |
+        Whether to consider only the direct members of user group and not members
+        of its subgroups. Default is `False`.
+      schema:
+        type: boolean
+      example: false
+      required: false

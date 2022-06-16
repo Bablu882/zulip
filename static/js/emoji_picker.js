@@ -1,7 +1,6 @@
 import $ from "jquery";
 
 import emoji_codes from "../generated/emoji/emoji_codes.json";
-import * as emoji from "../shared/js/emoji";
 import * as typeahead from "../shared/js/typeahead";
 import render_emoji_popover from "../templates/emoji_popover.hbs";
 import render_emoji_popover_content from "../templates/emoji_popover_content.hbs";
@@ -10,11 +9,14 @@ import render_emoji_showcase from "../templates/emoji_showcase.hbs";
 
 import * as blueslip from "./blueslip";
 import * as compose_ui from "./compose_ui";
+import * as emoji from "./emoji";
 import * as message_lists from "./message_lists";
 import * as message_store from "./message_store";
+import {page_params} from "./page_params";
 import * as popovers from "./popovers";
 import * as reactions from "./reactions";
 import * as rows from "./rows";
+import * as spectators from "./spectators";
 import * as ui from "./ui";
 import {user_settings} from "./user_settings";
 import * as user_status_ui from "./user_status_ui";
@@ -217,6 +219,19 @@ function get_rendered_emoji(section, index) {
     return undefined;
 }
 
+export function is_emoji_present_in_text(text, emoji_dict) {
+    // fetching emoji details to ensure emoji_code and reaction_type are present
+    const emoji_info = emoji.get_emoji_details_by_name(emoji_dict.name);
+    if (typeahead.is_unicode_emoji(emoji_info)) {
+        // convert emoji_dict to an actual emoji character
+        const parsed_emoji_code = typeahead.parse_unicode_emoji_code(emoji_info.emoji_code);
+
+        return text.includes(parsed_emoji_code);
+    }
+
+    return false;
+}
+
 function filter_emojis() {
     const $elt = $(".emoji-popover-filter").expectOne();
     const query = $elt.val().trim().toLowerCase();
@@ -232,7 +247,6 @@ function filter_emojis() {
                 continue;
             }
             const emojis = category.emojis;
-
             for (const emoji_dict of emojis) {
                 for (const alias of emoji_dict.aliases) {
                     const match = search_terms.every((search_term) => alias.includes(search_term));
@@ -240,6 +254,12 @@ function filter_emojis() {
                         search_results.push({...emoji_dict, emoji_name: alias});
                         break; // We only need the first matching alias per emoji.
                     }
+                }
+
+                // using query instead of search_terms because it's possible multiple emojis were input
+                // without being separated by spaces
+                if (is_emoji_present_in_text(query, emoji_dict)) {
+                    search_results.push({...emoji_dict, emoji_name: emoji_dict.name});
                 }
             }
         }
@@ -717,6 +737,11 @@ export function register_click_handlers() {
 
     $("#main_div").on("click", ".reaction_button", function (e) {
         e.stopPropagation();
+
+        if (page_params.is_spectator) {
+            spectators.login_to_access();
+            return;
+        }
 
         const message_id = rows.get_message_id(this);
         toggle_emoji_popover(this, message_id);

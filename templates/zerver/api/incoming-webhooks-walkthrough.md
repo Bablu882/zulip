@@ -258,7 +258,7 @@ After running the above command, you should see something similar to:
 Using `manage.py` from within the Zulip development environment:
 
 ```console
-(zulip-py3-venv) vagrant@debian-10:/srv/zulip$
+(zulip-py3-venv) vagrant@vagrant:/srv/zulip$
 ./manage.py send_webhook_fixture_message \
     --fixture=zerver/webhooks/helloworld/fixtures/hello.json \
     '--url=http://localhost:9991/api/v1/external/helloworld?api_key=<api_key>'
@@ -384,7 +384,7 @@ Once you have written some tests, you can run just these new tests from within
 the Zulip development environment with this command:
 
 ```console
-(zulip-py3-venv) vagrant@debian-10:/srv/zulip$
+(zulip-py3-venv) vagrant@vagrant:/srv/zulip$
 ./tools/test-backend zerver/webhooks/helloworld
 ```
 
@@ -433,7 +433,7 @@ stream name:
 To trigger a notification using this webhook, use
 `send_webhook_fixture_message` from the Zulip command line:
 
-    (zulip-py3-venv) vagrant@debian-10:/srv/zulip$
+    (zulip-py3-venv) vagrant@vagrant:/srv/zulip$
     ./manage.py send_webhook_fixture_message \
         --fixture=zerver/tests/fixtures/helloworld/hello.json \
         '--url=http://localhost:9991/api/v1/external/helloworld?api_key=&lt;api_key&gt;'
@@ -610,7 +610,7 @@ event = validate_extract_webhook_http_header(request, header, integration_name)
 ```
 
 `request` is the `HttpRequest` object passed to your main webhook function. `header`
-is the name of the custom header you'd like to extract, such as `X_EVENT_KEY`, and
+is the name of the custom header you'd like to extract, such as `X-Event-Key`, and
 `integration_name` is the name of the third-party service in question, such as
 `GitHub`.
 

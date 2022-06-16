@@ -30,8 +30,6 @@ import * as message_edit from "./message_edit";
 import * as message_edit_history from "./message_edit_history";
 import * as message_lists from "./message_lists";
 import * as message_viewport from "./message_viewport";
-import * as muted_topics from "./muted_topics";
-import * as muted_topics_ui from "./muted_topics_ui";
 import * as muted_users from "./muted_users";
 import * as muted_users_ui from "./muted_users_ui";
 import * as narrow from "./narrow";
@@ -44,6 +42,7 @@ import * as realm_playground from "./realm_playground";
 import * as reminder from "./reminder";
 import * as resize from "./resize";
 import * as rows from "./rows";
+import * as settings_config from "./settings_config";
 import * as settings_data from "./settings_data";
 import * as settings_users from "./settings_users";
 import * as stream_popover from "./stream_popover";
@@ -207,6 +206,7 @@ function render_user_info_popover(
     }
 
     const muting_allowed = !is_me && !user.is_bot;
+    const is_active = people.is_active_user_for_popover(user.user_id);
     const is_muted = muted_users.is_user_muted(user.user_id);
     const status_text = user_status.get_status_text(user.user_id);
     const status_emoji_info = user_status.get_status_emoji(user.user_id);
@@ -223,9 +223,14 @@ function render_user_info_popover(
         can_set_away,
         can_mute: muting_allowed && !is_muted,
         can_manage_user: page_params.is_admin && !is_me,
+        can_send_private_message:
+            is_active &&
+            !is_me &&
+            page_params.realm_private_message_policy !==
+                settings_config.private_message_policy_values.disabled.code,
         can_unmute: muting_allowed && is_muted,
         has_message_context,
-        is_active: people.is_active_user_for_popover(user.user_id),
+        is_active,
         is_bot: user.is_bot,
         is_me,
         is_sender_popover,
@@ -469,14 +474,6 @@ export function toggle_actions_popover(element, id) {
             use_edit_icon = false;
             editability_menu_item = $t({defaultMessage: "View source"});
         }
-        const topic = message.topic;
-        const can_mute_topic =
-            message.stream &&
-            topic &&
-            !muted_topics.is_topic_muted(message.stream_id, topic) &&
-            not_spectator;
-        const can_unmute_topic =
-            message.stream && topic && muted_topics.is_topic_muted(message.stream_id, topic);
 
         const should_display_edit_history_option =
             message.edit_history &&
@@ -515,11 +512,8 @@ export function toggle_actions_popover(element, id) {
             message_id: message.id,
             historical: message.historical,
             stream_id: message.stream_id,
-            topic,
             use_edit_icon,
             editability_menu_item,
-            can_mute_topic,
-            can_unmute_topic,
             should_display_collapse,
             should_display_uncollapse,
             should_display_add_reaction_option: message.sent_by_me,
@@ -727,6 +721,12 @@ export function hide_user_sidebar_popover() {
         current_user_sidebar_user_id = undefined;
         current_user_sidebar_popover = undefined;
     }
+}
+
+function hide_all_user_info_popovers() {
+    hide_message_info_popover();
+    hide_user_sidebar_popover();
+    hide_user_info_popover();
 }
 
 function focus_user_info_popover_item() {
@@ -1018,9 +1018,7 @@ export function register_click_handlers() {
 
     $("body").on("click", ".info_popover_actions .sidebar-popover-mute-user", (e) => {
         const user_id = elem_to_user_id($(e.target).parents("ul"));
-        hide_message_info_popover();
-        hide_user_sidebar_popover();
-        hide_user_info_popover();
+        hide_all_user_info_popovers();
         e.stopPropagation();
         e.preventDefault();
         muted_users_ui.confirm_mute_user(user_id);
@@ -1028,9 +1026,7 @@ export function register_click_handlers() {
 
     $("body").on("click", ".info_popover_actions .sidebar-popover-unmute-user", (e) => {
         const user_id = elem_to_user_id($(e.target).parents("ul"));
-        hide_message_info_popover();
-        hide_user_sidebar_popover();
-        hide_user_info_popover();
+        hide_all_user_info_popovers();
         muted_users_ui.unmute_user(user_id);
         e.stopPropagation();
         e.preventDefault();
@@ -1238,26 +1234,6 @@ export function register_click_handlers() {
         e.preventDefault();
     });
 
-    $("body").on("click", ".popover_mute_topic", (e) => {
-        const stream_id = Number.parseInt($(e.currentTarget).attr("data-msg-stream-id"), 10);
-        const topic = $(e.currentTarget).attr("data-msg-topic");
-
-        hide_actions_popover();
-        muted_topics_ui.mute_topic(stream_id, topic);
-        e.stopPropagation();
-        e.preventDefault();
-    });
-
-    $("body").on("click", ".popover_unmute_topic", (e) => {
-        const stream_id = Number.parseInt($(e.currentTarget).attr("data-msg-stream-id"), 10);
-        const topic = $(e.currentTarget).attr("data-msg-topic");
-
-        hide_actions_popover();
-        muted_topics_ui.unmute_topic(stream_id, topic);
-        e.stopPropagation();
-        e.preventDefault();
-    });
-
     $("body").on("click", ".delete_message", (e) => {
         const message_id = $(e.currentTarget).data("message-id");
         hide_actions_popover();
@@ -1349,7 +1325,6 @@ export function hide_all_except_sidebars(opts) {
         hideAll({exclude: opts.exclude_tippy_instance});
     }
     hide_actions_popover();
-    hide_message_info_popover();
     emoji_picker.hide_emoji_popover();
     giphy.hide_giphy_popover();
     stream_popover.hide_stream_popover();
@@ -1357,8 +1332,7 @@ export function hide_all_except_sidebars(opts) {
     stream_popover.hide_all_messages_popover();
     stream_popover.hide_starred_messages_popover();
     stream_popover.hide_drafts_popover();
-    hide_user_sidebar_popover();
-    hide_user_info_popover();
+    hide_all_user_info_popovers();
     hide_playground_links_popover();
 
     // look through all the popovers that have been added and removed.

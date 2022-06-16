@@ -1,11 +1,11 @@
-from typing import Any, List, Mapping, Set
+from typing import TYPE_CHECKING, Any, List, Mapping, Set
 from unittest import mock
 
 import orjson
 from django.db import connection
-from django.http import HttpResponse
 
-from zerver.lib.actions import do_change_stream_permission, do_update_message_flags
+from zerver.actions.message_flags import do_update_message_flags
+from zerver.actions.streams import do_change_stream_permission
 from zerver.lib.fix_unreads import fix, fix_unsubscribed
 from zerver.lib.message import (
     MessageDetailsDict,
@@ -33,6 +33,9 @@ from zerver.models import (
     get_realm,
     get_stream,
 )
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
 
 
 def check_flags(flags: List[str], expected: Set[str]) -> None:
@@ -274,7 +277,7 @@ class UnreadCountTests(ZulipTestCase):
                 "stream_id": invalid_stream_id,
             },
         )
-        self.assert_json_error(result, "Invalid stream id")
+        self.assert_json_error(result, "Invalid stream ID")
 
     def test_mark_all_topics_unread_with_invalid_stream_name(self) -> None:
         self.login("hamlet")
@@ -286,7 +289,7 @@ class UnreadCountTests(ZulipTestCase):
                 "topic_name": "whatever",
             },
         )
-        self.assert_json_error(result, "Invalid stream id")
+        self.assert_json_error(result, "Invalid stream ID")
 
     def test_mark_all_in_stream_topic_read(self) -> None:
         self.login("hamlet")
@@ -1018,7 +1021,9 @@ class MessageAccessTests(ZulipTestCase):
         )
         self.assert_json_error(result, "Invalid message flag operation: 'bogus'")
 
-    def change_star(self, messages: List[int], add: bool = True, **kwargs: Any) -> HttpResponse:
+    def change_star(
+        self, messages: List[int], add: bool = True, **kwargs: Any
+    ) -> "TestHttpResponse":
         return self.client_post(
             "/json/messages/flags",
             {

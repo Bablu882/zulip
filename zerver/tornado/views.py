@@ -1,14 +1,15 @@
 import time
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence, TypeVar
 
 import orjson
+from asgiref.sync import async_to_sync
 from django.http import HttpRequest, HttpResponse
 from django.utils.translation import gettext as _
 
 from zerver.decorator import internal_notify_view, process_client
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.request import REQ, RequestNotes, has_request_variables
-from zerver.lib.response import json_success
+from zerver.lib.response import AsynchronousResponse, json_success
 from zerver.lib.validator import (
     check_bool,
     check_int,
@@ -20,10 +21,19 @@ from zerver.models import Client, UserProfile, get_client, get_user_profile_by_i
 from zerver.tornado.event_queue import fetch_events, get_client_descriptor, process_notification
 from zerver.tornado.exceptions import BadEventQueueIdError
 
+T = TypeVar("T")
+
+
+def in_tornado_thread(f: Callable[[], T]) -> T:
+    async def wrapped() -> T:
+        return f()
+
+    return async_to_sync(wrapped)()
+
 
 @internal_notify_view(True)
 def notify(request: HttpRequest) -> HttpResponse:
-    process_notification(orjson.loads(request.POST["data"]))
+    in_tornado_thread(lambda: process_notification(orjson.loads(request.POST["data"])))
     return json_success(request)
 
 
@@ -39,7 +49,7 @@ def cleanup_event_queue(
     log_data = RequestNotes.get_notes(request).log_data
     assert log_data is not None
     log_data["extra"] = f"[{queue_id}]"
-    client.cleanup()
+    in_tornado_thread(client.cleanup)
     return json_success(request)
 
 
@@ -115,6 +125,7 @@ def get_events_backend(
     assert tornado_handler is not None
     handler = tornado_handler()
     assert handler is not None
+    handler._request = request
 
     if user_client is None:
         valid_user_client = RequestNotes.get_notes(request).client
@@ -153,20 +164,17 @@ def get_events_backend(
             user_settings_object=user_settings_object,
         )
 
-    result = fetch_events(events_query)
+    result = in_tornado_thread(lambda: fetch_events(events_query))
     if "extra_log_data" in result:
         log_data = RequestNotes.get_notes(request).log_data
         assert log_data is not None
         log_data["extra"] = result["extra_log_data"]
 
     if result["type"] == "async":
-        # Mark this response with .asynchronous; this will result in
+        # Return an AsynchronousResponse; this will result in
         # Tornado discarding the response and instead long-polling the
         # request.  See zulip_finish for more design details.
-        handler._request = request
-        response = json_success(request)
-        response.asynchronous = True
-        return response
+        return AsynchronousResponse()
     if result["type"] == "error":
         raise result["exception"]
     return json_success(request, data=result["response"])

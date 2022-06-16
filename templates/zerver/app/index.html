@@ -37,9 +37,20 @@
     #app-loading-middle-content h3 {
     text-align: center;
     }
+    @keyframes showAtEnd {
+    99% {
+    visibility: hidden;
+    }
+    100% {
+    visibility: visible;
+    }
+    }
     #app-loading-bottom-content {
     top: unset;
     bottom: 20px;
+    animation: 7s showAtEnd;
+    animation-fill-mode: forwards;
+    visibility: hidden;
     }
     body.color-scheme-automatic #app-loading{
     color: hsl(0, 3%, 6%);
@@ -67,8 +78,13 @@
         <h3>{{ _('Loading...') }}</h3>
     </div>
     <div id="app-loading-bottom-content">
+<<<<<<< HEAD
         <p>{% trans %}If this message does not go away, please wait a couple seconds and <a id="reload-lnk">reload</a> the page.{% endtrans %}</p>
         <script nonce="{{ csp_nonce }}">feedback_container
+=======
+        <p>{% trans %}If this message does not go away, try <a id="reload-lnk">reloading</a> the page.{% endtrans %}</p>
+        <script nonce="{{ csp_nonce }}">
+>>>>>>> main
             document.addEventListener('DOMContentLoaded', function () {
                 function reload() {
                     location.reload(true);
@@ -224,10 +240,6 @@
         </form>
     </div>
     <div id="user-profile-modal-holder"></div>
-    <div id="delete-topic-modal-holder"></div>
-    <div class="left-sidebar-modal-holder"></div>
-    <div class="mute-user-modal-holder"></div>
-    <div id="move-a-topic-modal-holder"></div>
     <audio id="user-notification-sound-audio">
         <source class="notification-sound-source-ogg" type="audio/ogg" />
         <source class="notification-sound-source-mp3" type="audio/mpeg" />
@@ -236,6 +248,5 @@
         <source class="notification-sound-source-ogg" type="audio/ogg" />
         <source class="notification-sound-source-mp3" type="audio/mpeg" />
     </audio>
-    <div id="login-to-access-modal-holder"></div>
 </div>
 {% endblock %}
