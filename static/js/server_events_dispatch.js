@@ -13,6 +13,8 @@ import * as compose_fade from "./compose_fade";
 import * as compose_pm_pill from "./compose_pm_pill";
 import * as composebox_typeahead from "./composebox_typeahead";
 import * as dark_theme from "./dark_theme";
+import * as diff_theme from "./diff_theme";
+
 import * as emoji from "./emoji";
 import * as emoji_picker from "./emoji_picker";
 import * as giphy from "./giphy";
